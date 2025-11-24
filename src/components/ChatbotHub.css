@@ -69,8 +69,9 @@
 
 .card-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+  /* reduce min column width so cards can fit on narrow screens without overflowing */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
   max-width: 1200px;
   margin: 0 auto 3rem;
 }
@@ -769,5 +770,25 @@
   .marks-selection-container {
     flex: 0 0 76px;
     width: 76px;
+  }
+
+  /* Improve EduBoat/card layout on very small screens */
+  .eduboat-container {
+    padding: 1rem 0.75rem;
+  }
+
+  .card-section {
+    grid-template-columns: 1fr; /* stack cards vertically on very small screens */
+    gap: 1rem;
+    margin: 0.5rem auto 1.5rem;
+  }
+
+  .card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .card h3 {
+    font-size: 1.1rem;
   }
 }
