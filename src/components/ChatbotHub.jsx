@@ -34,6 +34,17 @@ const ChatbotHub = () => {
     }));
     setInput('');
 
+    // append the user's message to the conversation immediately
+    setMessages(prev => ({
+      ...prev,
+      [activeMode]: [...(prev[activeMode] || []), { type: 'user', text: userMessage }]
+    }));
+
+    // clear the input so it doesn't keep the typed text after sending
+    setInput("");
+    // close marks dropdown when a message is sent
+    setShowMarksDropdown(false);
+
     setIsTyping(true);
 
 const endpoint = "http://127.0.0.1:8000/ask"; // your FastAPI server URL
