@@ -11,13 +11,14 @@ const ChatbotHub = () => {
     examprep: [{ type: "bot", text: "Welcome to ExamPrep! Get exam-ready answers ✍️" }],
     deepdive: [{ type: "bot", text: "Welcome to DeepDive! Explore concepts thoroughly 🌊" }]
   });
+
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedMarks, setSelectedMarks] = useState(5); // Default to 5 marks
+  const [selectedMarks, setSelectedMarks] = useState(5);
   const [showMarksDropdown, setShowMarksDropdown] = useState(false);
-  const chatboxRef = useRef(null);
 
-  // Track previous messages length to scroll only on new messages
+  const chatboxRef = useRef(null);
+  const eduboatRef = useRef(null);
   const prevMessagesLengthRef = useRef(0);
 
   const sendMessage = () => {
@@ -30,13 +31,15 @@ const ChatbotHub = () => {
 
     setMessages(prev => ({
       ...prev,
-      [activeMode]: [...(prev[activeMode] || []), { type: 'user', text: userMessage }],
+      [activeMode]: [...prev[activeMode], { type: "user", text: userMessage }]
     }));
-    setInput('');
+
+    setInput("");
     setShowMarksDropdown(false);
     setIsTyping(true);
 
-    const endpoint = "http://127.0.0.1:8000/ask"; // your FastAPI server URL
+    const endpoint = "http://127.0.0.1:8000/ask";
+
     const payload = {
       question: messageToSend,
       marks: activeMode === "examprep" ? selectedMarks : 5,
@@ -55,29 +58,28 @@ const ChatbotHub = () => {
         return res.json();
       })
       .then((data) => {
-        setMessages((prev) => ({
+        setMessages(prev => ({
           ...prev,
-          [activeMode]: [...prev[activeMode], { type: "bot", text: data.answer }],
+          [activeMode]: [...prev[activeMode], { type: "bot", text: data.answer }]
         }));
       })
       .catch((error) => {
-        setMessages((prev) => ({
+        setMessages(prev => ({
           ...prev,
           [activeMode]: [
             ...prev[activeMode],
-            { type: "bot", text:  `Error: ${error.message}` },
+            { type: "bot", text: `Error: ${error.message}` }
           ],
         }));
       })
       .finally(() => setIsTyping(false));
   };
 
-  // Navigate between modes
   const navigateToMode = (mode) => {
     setActiveMode(mode);
     try {
       const hash = `#Chatbot-${mode}`;
-      window.history.pushState({ section: 'Chatbot', chatbotMode: mode }, '', hash);
+      window.history.pushState({ section: "Chatbot", chatbotMode: mode }, "", hash);
     } catch {}
   };
 
@@ -85,60 +87,85 @@ const ChatbotHub = () => {
     if (e.key === "Enter") sendMessage();
   };
 
-  // Scroll to bottom only when new message added
   useEffect(() => {
     const currentMessagesLength = (messages[activeMode] || []).length;
 
     if (chatboxRef.current && currentMessagesLength > prevMessagesLengthRef.current) {
-      chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
+      try {
+        chatboxRef.current.scrollTo({
+          top: chatboxRef.current.scrollHeight,
+          behavior: "smooth"
+        });
+      } catch {
+        chatboxRef.current.scrollTop = chatboxRef.current.scrollHeight;
+      }
     }
 
     prevMessagesLengthRef.current = currentMessagesLength;
   }, [messages, activeMode]);
 
-  // Scroll to top when switching modes
   useEffect(() => {
     if (chatboxRef.current) {
-      chatboxRef.current.scrollTop = 0;
+      try {
+        chatboxRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      } catch {
+        chatboxRef.current.scrollTop = 0;
+      }
     }
+
+    try {
+      if (activeMode === "eduboat") {
+        requestAnimationFrame(() => {
+          if (eduboatRef.current) {
+            eduboatRef.current.scrollIntoView({ behavior: "auto", block: "start" });
+          } else {
+            window.scrollTo({ top: 0, behavior: "auto" });
+          }
+        });
+      }
+    } catch {}
   }, [activeMode]);
 
-  // Close marks dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showMarksDropdown && !event.target.closest('.marks-selection-container')) {
+      if (showMarksDropdown && !event.target.closest(".marks-selection-container")) {
         setShowMarksDropdown(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMarksDropdown]);
 
-  // Handle browser/back navigation for Chatbot modes
   useEffect(() => {
     const parseHashMode = () => {
       try {
-        const h = (window.location.hash || '').replace('#', '');
-        if (h.startsWith('Chatbot-')) return h.split('-')[1];
+        const h = window.location.hash.replace("#", "");
+        if (h.startsWith("Chatbot-")) return h.split("-")[1];
       } catch {}
       return null;
     };
+
     const initialMode = parseHashMode();
     if (initialMode) setActiveMode(initialMode);
-    window.history.replaceState({ section: 'Chatbot' }, '', window.location.hash || '#Chatbot');
+
+    window.history.replaceState(
+      { section: "Chatbot" },
+      "",
+      window.location.hash || "#Chatbot"
+    );
 
     const onPop = (e) => {
       const state = e.state || {};
-      if (state.section === 'Chatbot') {
-        setActiveMode(state.chatbotMode || 'eduboat');
+      if (state.section === "Chatbot") {
+        setActiveMode(state.chatbotMode || "eduboat");
       }
     };
 
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Scroll reveal animation for EduBoat cards
   useEffect(() => {
     if (activeMode === "eduboat") {
       const reveals = document.querySelectorAll(".reveal");
@@ -155,23 +182,39 @@ const ChatbotHub = () => {
           }
         }
       };
+
       window.addEventListener("scroll", handleScroll);
       handleScroll();
       return () => window.removeEventListener("scroll", handleScroll);
     }
   }, [activeMode]);
 
-  // Get styling for each mode
   const getModeConfig = () => {
     switch (activeMode) {
       case "quickhelp":
-        return { name: "⚡ QuickHelp", gradient: "linear-gradient(135deg, #a18cd1, #fbc2eb)", userGradient: "linear-gradient(135deg, #42a5f5, #1e88e5)" };
+        return {
+          name: "⚡ QuickHelp",
+          gradient: "linear-gradient(135deg, #a18cd1, #fbc2eb)",
+          userGradient: "linear-gradient(135deg, #42a5f5, #1e88e5)"
+        };
       case "examprep":
-        return { name: "📘 ExamPrep", gradient: "linear-gradient(135deg, #667eea, #5a67f2)", userGradient: "linear-gradient(135deg, #667eea, #5a67f2)" };
+        return {
+          name: "📘 ExamPrep",
+          gradient: "linear-gradient(135deg, #667eea, #5a67f2)",
+          userGradient: "linear-gradient(135deg, #667eea, #5a67f2)"
+        };
       case "deepdive":
-        return { name: "🔍 DeepDive", gradient: "linear-gradient(135deg, #ff7e5f, #feb47b)", userGradient: "linear-gradient(135deg, #667eea, #5a67f2)" };
+        return {
+          name: "🔍 DeepDive",
+          gradient: "linear-gradient(135deg, #ff7e5f, #feb47b)",
+          userGradient: "linear-gradient(135deg, #667eea, #5a67f2)"
+        };
       default:
-        return { name: "🚢 EduBoat", gradient: "linear-gradient(135deg, #4facfe, #00f2fe)", userGradient: "linear-gradient(135deg, #42a5f5, #1e88e5)" };
+        return {
+          name: "🚢 EduBoat",
+          gradient: "linear-gradient(135deg, #4facfe, #00f2fe)",
+          userGradient: "linear-gradient(135deg, #42a5f5, #1e88e5)"
+        };
     }
   };
 
@@ -179,36 +222,43 @@ const ChatbotHub = () => {
   const currentMessages = messages[activeMode] || [];
 
   const escapeHtml = (str) =>
-    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
   const renderMarkdown = (text) => {
-    if (!text) return '';
+    if (!text) return "";
+
     let escaped = escapeHtml(text);
-    escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
-    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    escaped = escaped.replace(/\n/g, '<br>');
+    escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    escaped = escaped.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+    escaped = escaped.replace(/\n/g, "<br>");
+
     return escaped;
   };
 
   if (activeMode === "eduboat") {
     return (
-      <div className="eduboat-container">
+      <div className="eduboat-container" ref={eduboatRef}>
         <header className="header reveal">
           <h1>AcadBoat</h1>
           <p className="subtitle">Study made simple with smart support.</p>
         </header>
+
         <div className="card-section">
-          <div className="reveal" onClick={() => navigateToMode("quickhelp")} style={{ cursor: "pointer" }}>
+          <div className="reveal" onClick={() => navigateToMode("quickhelp")}>
             <QuickHelpCard />
           </div>
-          <div className="reveal" onClick={() => navigateToMode("deepdive")} style={{ cursor: "pointer" }}>
+          <div className="reveal" onClick={() => navigateToMode("deepdive")}>
             <DeepDiveCard />
           </div>
-          <div className="reveal" onClick={() => navigateToMode("examprep")} style={{ cursor: "pointer" }}>
+          <div className="reveal" onClick={() => navigateToMode("examprep")}>
             <ExamPrepCard />
           </div>
         </div>
+
         <footer className="footer reveal">✨ Happy learning!</footer>
       </div>
     );
@@ -229,9 +279,14 @@ const ChatbotHub = () => {
         <div ref={chatboxRef} className="messages-container">
           {currentMessages.map((msg, index) => (
             <div key={index} className={`message ${msg.type}`}>
-              {msg.type === 'bot' ? (
-                <div className="bot-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
-              ) : msg.text}
+              {msg.type === "bot" ? (
+                <div
+                  className="bot-content"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }}
+                />
+              ) : (
+                msg.text
+              )}
             </div>
           ))}
 
@@ -250,22 +305,33 @@ const ChatbotHub = () => {
         <div className="input-area">
           <input
             type="text"
+            className="message-input"
+            placeholder="Type your question..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="Type your question..."
-            className="message-input"
           />
 
           {activeMode === "examprep" && (
             <div className="marks-selection-container">
-              <button onClick={() => setShowMarksDropdown(!showMarksDropdown)} className="marks-button" title="Select marks">
+              <button
+                className="marks-button"
+                onClick={() => setShowMarksDropdown(!showMarksDropdown)}
+              >
                 {selectedMarks} marks
               </button>
+
               {showMarksDropdown && (
                 <div className="marks-dropdown">
-                  {[2, 3, 4, 5, 6, 7, 8, 10].map(m => (
-                    <button key={m} onClick={() => { setSelectedMarks(m); setShowMarksDropdown(false); }} className={`marks-option ${selectedMarks === m ? 'selected' : ''}`}>
+                  {[2, 3, 4, 5, 6, 7, 8, 10].map((m) => (
+                    <button
+                      key={m}
+                      className={`marks-option ${selectedMarks === m ? "selected" : ""}`}
+                      onClick={() => {
+                        setSelectedMarks(m);
+                        setShowMarksDropdown(false);
+                      }}
+                    >
                       {m} marks
                     </button>
                   ))}

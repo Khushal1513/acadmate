@@ -137,6 +137,14 @@
   transform: translateY(0);
 }
 
+/* Disable reveal/slide-up animations on the EduBoat landing so it appears instantly */
+.eduboat-container .reveal,
+.eduboat-container .reveal.active {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
 .chatbot-hub {
   display: flex;
   flex-direction: column;
