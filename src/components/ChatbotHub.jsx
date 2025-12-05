@@ -125,6 +125,43 @@ fetch(endpoint, {
     };
   }, [showMarksDropdown]);
 
+  // Handle browser/back navigation for Chatbot modes
+  useEffect(() => {
+    // When ChatbotHub mounts, if the hash encodes a sub-mode (e.g. #Chatbot-examprep), set it
+    const parseHashMode = () => {
+      try {
+        const h = (window.location.hash || '').replace('#', '');
+        if (h.startsWith('Chatbot-')) return h.split('-')[1];
+      } catch {}
+      return null;
+    };
+
+    const initialMode = parseHashMode();
+    if (initialMode) {
+      setActiveMode(initialMode);
+      try { window.history.replaceState({ section: 'Chatbot', chatbotMode: initialMode }, '', window.location.hash || `#Chatbot-${initialMode}`); } catch {}
+    } else {
+      // ensure there's at least a Chatbot state so push/pop behave predictably
+      try { window.history.replaceState({ section: 'Chatbot' }, '', window.location.hash || '#Chatbot'); } catch {}
+    }
+
+    const onPop = (e) => {
+      const state = (e.state || {});
+      // If popstate includes a chatbotMode key, use it. If not (or null), go to eduboat.
+      if (state && state.section === 'Chatbot') {
+        if (state.chatbotMode) setActiveMode(state.chatbotMode);
+        else setActiveMode('eduboat');
+        return;
+      }
+
+      // If popstate moved away from Chatbot entirely, keep App's behavior (App will change activeSection)
+      // but also ensure the internal mode resets when Chatbot is shown again.
+    };
+
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   // Scroll reveal animation for EduBoat cards
   useEffect(() => {
     if (activeMode === "eduboat") {
@@ -184,6 +221,15 @@ fetch(endpoint, {
   const modeConfig = getModeConfig();
   const currentMessages = messages[activeMode] || [];
 
+  // Helper to navigate to a sub-mode inside Chatbot and push history state
+  const navigateToMode = (mode) => {
+    setActiveMode(mode);
+    try {
+      const hash = `#Chatbot-${mode}`;
+      window.history.pushState({ section: 'Chatbot', chatbotMode: mode }, '', hash);
+    } catch {}
+  };
+
   // If we're in EduBoat mode, show the card interface
   if (activeMode === "eduboat") {
     return (
@@ -196,13 +242,13 @@ fetch(endpoint, {
 
         {/* Cards */}
         <div className="card-section">
-          <div className="reveal" onClick={() => setActiveMode("quickhelp")} style={{ cursor: "pointer" }}>
+          <div className="reveal" onClick={() => navigateToMode("quickhelp")} style={{ cursor: "pointer" }}>
             <QuickHelpCard />
           </div>
-          <div className="reveal" onClick={() => setActiveMode("deepdive")} style={{ cursor: "pointer" }}>
+          <div className="reveal" onClick={() => navigateToMode("deepdive")} style={{ cursor: "pointer" }}>
             <DeepDiveCard />
           </div>
-          <div className="reveal" onClick={() => setActiveMode("examprep")} style={{ cursor: "pointer" }}>
+          <div className="reveal" onClick={() => navigateToMode("examprep")} style={{ cursor: "pointer" }}>
             <ExamPrepCard />
           </div>
         </div>
@@ -220,12 +266,6 @@ fetch(endpoint, {
     <div className="chatbot-hub">
       {/* Header */}
       <header className="chatbot-header">
-        <button
-          onClick={() => setActiveMode("eduboat")}
-          className="back-button-header"
-          title="Back to AcadBoat"
-        >
-        </button>
         <h1>{modeConfig.name}</h1>
         <p className="chatbot-subtitle">
           {activeMode === "quickhelp" && "Get instant explanations for quick understanding"}
