@@ -53,33 +53,51 @@ const ExamPrep = () => {
   const [isTyping, setIsTyping] = useState(false);
   const chatboxRef = useRef(null);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+  const sendMessage = async () => {
+  if (!input.trim()) return;
 
-    // Add user message
-    setMessages((prev) => [...prev, { type: "user", text: input }]);
-    setInput("");
-    setIsTyping(true);
+  // Add user message immediately
+  setMessages((prev) => [...prev, { type: "user", text: input }]);
+  const userInput = input;
+  setInput("");
+  setIsTyping(true);
 
-    // Integrate your ExamPrep AI API here:
-    // 1) Replace the setTimeout with a fetch/axios call to your exam-prep endpoint.
-    // 2) Use setMessages to place the response into the chat.
-    // Example:
-    // fetch("/api/examprep", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: input }) })
-    //   .then(res => res.json())
-    //   .then(data => setMessages(prev => [...prev, { type: "bot", text: data.answer }]))
-    //   .catch(() => setMessages(prev => [...prev, { type: "bot", text: "Sorry, something went wrong." }]))
-    //   .finally(() => setIsTyping(false));
+  try {
+    // 🔗 Connect to your FastAPI backend
+  const response = await fetch("http://127.0.0.1:8000/ask", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    question: questionText,
+    marks: marksNum,
+    top_k: 5,
+    temperature: 0.3
+  })
+});
 
-    // Simulated bot response (remove when API is wired)
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { type: "bot", text: "Here’s the exam-ready answer for: " + input },
-      ]);
-      setIsTyping(false);
-    }, 800);
-  };
+
+    if (!res.ok) {
+      throw new Error("Server error");
+    }
+
+    const data = await res.json();
+
+    // Add bot reply
+    setMessages((prev) => [
+      ...prev,
+      { type: "bot", text: data.answer || "No response from AI." },
+    ]);
+  } catch (error) {
+    // Handle failure gracefully
+    setMessages((prev) => [
+      ...prev,
+      { type: "bot", text: "⚠️ Error: Could not fetch answer from server." },
+    ]);
+  } finally {
+    setIsTyping(false);
+  }
+};
+
 
   // Scroll to bottom
   useEffect(() => {
