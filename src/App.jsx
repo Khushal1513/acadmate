@@ -33,18 +33,30 @@ function App() {
     'Profile': 'Profile'
   };
 
+  // ✅ Restore login state from localStorage on refresh
+  useEffect(() => {
+    const savedUser = localStorage.getItem('userData');
+    const savedLogin = localStorage.getItem('isLoggedIn');
+
+    if (savedLogin === 'true' && savedUser) {
+      setIsLoggedIn(true);
+      setUserData(JSON.parse(savedUser));
+    }
+  }, []);
+
   const getSectionFromUrl = useCallback((e = null) => {
     const hash = window.location.hash || '';
     if (hash.startsWith('#Task-')) return 'TaskManager';
 
-    // FIX: Only look at the part before the first slash
     const cleanHash = hash.replace('#', '').split('/')[0].trim();
 
     if (cleanHash && cleanHash !== 'TaskManager') {
       const recognizedSections = Object.keys(hashToSectionMap);
-      const isRecognizedSection = recognizedSections.some(s => cleanHash === s || cleanHash === s.replace(/\s+/g, ''));
+      const isRecognizedSection = recognizedSections.some(
+        s => cleanHash === s || cleanHash === s.replace(/\s+/g, '')
+      );
       if (isRecognizedSection) {
-         return hashToSectionMap[cleanHash] || cleanHash;
+        return hashToSectionMap[cleanHash] || cleanHash;
       }
     }
     return 'Home';
@@ -55,14 +67,11 @@ function App() {
     setActiveSection(section);
   }, [getSectionFromUrl]);
 
-
   useEffect(() => {
     const onPopState = (e) => {
       isNavigatingFromBrowser.current = true;
       const section = getSectionFromUrl(e);
-      
-      // FIX: Only force-reset Study Materials if we are at the ROOT of Study Materials
-      // If the URL is #StudyMaterials/subjects/..., we let StudyMaterials.jsx handle it.
+
       if (section === 'Study Materials' && !window.location.hash.includes('/')) {
         setComponentKey(prev => prev + 1);
       }
@@ -85,12 +94,12 @@ function App() {
 
     if (section === 'Profile') setShowProfile(true);
     else setShowProfile(false);
-    
+
     setActiveSection(section);
 
     if (!isFromBrowser) {
       const hash = `#${section.replace(/\s+/g, '')}`;
-      try { 
+      try {
         if (window.location.hash.split('/')[0] !== hash) {
           window.history.pushState({ section }, '', hash);
         }
@@ -103,23 +112,35 @@ function App() {
     handleSectionChangeInternal(section, false);
   };
 
+  // ✅ Save login to localStorage
   const handleLogin = (data) => {
     setUserData(data);
     setIsLoggedIn(true);
+
+    localStorage.setItem('userData', JSON.stringify(data));
+    localStorage.setItem('isLoggedIn', 'true');
+
     setIsLoginModalOpen(false);
     setShowProfile(false);
     handleSectionChange('Home');
   };
-  const handleShowProfile = () => { handleSectionChange('Profile'); };
+
+  // ✅ Clear localStorage on logout
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUserData(null);
     setShowProfile(false);
+
+    localStorage.removeItem('userData');
+    localStorage.removeItem('isLoggedIn');
+
     handleSectionChange('Home');
   };
+
+  const handleShowProfile = () => { handleSectionChange('Profile'); };
   const handleBackToHome = () => { handleSectionChange('Home'); };
 
-  // Team Data (Abbreviated for brevity, keep your original list)
+  // Team Data
   const teamMembers = [
     { name: 'Bhaskara', linkedin: 'https://www.linkedin.com/in/bhaskara-88aa76322/', github: 'https://github.com/bhaskara05' },
     { name: 'Khushal L', linkedin: 'https://linkedin.com/khushal-l', github: 'https://github.com/Khushal1513' },
@@ -165,36 +186,42 @@ function App() {
     switch (activeSection) {
       case 'Profile':
         return userData ? (
-            <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
-              <Profile user={userData} onLogout={handleLogout} />
-            </ProtectedRoute>
-          ) : <div>Loading...</div>;
+          <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
+            <Profile user={userData} onLogout={handleLogout} />
+          </ProtectedRoute>
+        ) : <div>Loading...</div>;
+
       case 'Home': 
         return <Home onSectionChange={handleSectionChange} isLoggedIn={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)} />;
+
       case 'Seniors': 
         return (
           <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
             <SeniorsPage onBackToHome={handleBackToHome} />
           </ProtectedRoute>
         );
+
       case 'TaskManager': 
         return (
           <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
             <Task />
           </ProtectedRoute>
         );
+
       case 'EventBuddy': 
         return (
           <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
             <CalendarPage />
           </ProtectedRoute>
         );
+
       case 'Chatbot':
         return (
           <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
             <ChatbotHub />
           </ProtectedRoute>
         );
+
       case 'Study Materials':
         return (
           <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
@@ -205,6 +232,7 @@ function App() {
             />
           </ProtectedRoute>
         );
+
       case 'About Us':
         return (
           <ProtectedRoute isAuthenticated={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)}>
@@ -240,6 +268,7 @@ function App() {
                           <h3 className="text-2xl font-bold custom-brown mb-2">{member.name}</h3>
                           <p className="text-sm custom-brown opacity-70">Team Member</p>
                         </div>
+
                         <div className="absolute inset-0 bg-white rounded-2xl p-6 flex flex-col items-center justify-center gap-5 [transform:rotateY(180deg)] [backface-visibility:hidden]">
                           <h4 className="text-xl font-semibold custom-brown">Connect</h4>
                           <div className="flex items-center gap-6">
@@ -251,6 +280,7 @@ function App() {
                             </a>
                           </div>
                         </div>
+
                       </div>
                     </div>
                   ))}
@@ -259,6 +289,7 @@ function App() {
             </div>
           </ProtectedRoute>
         );
+
       default:
         return <Home onSectionChange={handleSectionChange} isLoggedIn={isLoggedIn} onLoginRequired={() => setIsLoginModalOpen(true)} />;
     }
@@ -274,13 +305,13 @@ function App() {
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
       />
-      
+
       <div className="pt-16">
         {renderContent()}
       </div>
 
       {activeSection !== 'Chatbot' && <Footer onSectionChange={handleSectionChange} />}
-      
+
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
