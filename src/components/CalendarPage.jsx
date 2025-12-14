@@ -138,21 +138,45 @@ const CalendarPage = ({ onBackToHome }) => {
           }
 
           .btn-add {
-            background: var(--accent);
+            background: linear-gradient(135deg, #f4b30c 0%, #ff8c42 100%);
             color: var(--white);
             border: none;
-            padding: 0.6rem 1.2rem;
-            border-radius: 6px;
+            padding: 0.7rem 1.6rem;
+            border-radius: 999px;
             font-size: 0.9rem;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(244, 179, 12, 0.4);
+            letter-spacing: 0.3px;
+          }
+
+          .btn-add::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
           }
 
           .btn-add:hover {
-            background: #e0a800;
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, #ff8c42 0%, #f4b30c 100%);
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(244, 179, 12, 0.6);
+          }
+
+          .btn-add:hover::before {
+            left: 100%;
+          }
+
+          .btn-add:active {
+            transform: translateY(0) scale(0.98);
           }
 
           .calendar-nav-section {
@@ -177,20 +201,50 @@ const CalendarPage = ({ onBackToHome }) => {
           }
 
           .nav-btn {
-            background: var(--accent);
+            background: linear-gradient(135deg, #f4b30c 0%, #ff8c42 100%);
             color: var(--white);
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
+            padding: 0.6rem 1.2rem;
+            border-radius: 999px;
             font-size: 1rem;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(244, 179, 12, 0.4);
+            min-width: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .nav-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
           }
 
           .nav-btn:hover {
-            background: #e0a800;
-            transform: translateY(-1px);
+            background: linear-gradient(135deg, #ff8c42 0%, #f4b30c 100%);
+            transform: translateY(-2px) scale(1.1);
+            box-shadow: 0 8px 25px rgba(244, 179, 12, 0.6);
+          }
+
+          .nav-btn:hover::before {
+            width: 200px;
+            height: 200px;
+          }
+
+          .nav-btn:active {
+            transform: translateY(0) scale(0.95);
           }
 
           .calendar-grid-section {

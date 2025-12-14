@@ -15,6 +15,11 @@ const AttendanceTracker = ({ onBack }) => {
   const [selectedSubjectForCalendar, setSelectedSubjectForCalendar] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentDay, setCurrentDay] = useState(new Date().getDate());
+  const [sessionsDisplayLimit, setSessionsDisplayLimit] = useState({}); // Track display limit per subject
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showDayDropdown, setShowDayDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
 
   useEffect(() => {
     const savedData = localStorage.getItem('attendanceTrackerData');
@@ -31,6 +36,65 @@ const AttendanceTracker = ({ onBack }) => {
     const dataToSave = { subjects, targetPercentage };
     localStorage.setItem('attendanceTrackerData', JSON.stringify(dataToSave));
   }, [subjects, targetPercentage]);
+
+  // Auto-hide sessions list and calendar when scrolling up and reaching header part (top of page)
+  useEffect(() => {
+    const HEADER_THRESHOLD = 200; // Distance from top to consider as "header area"
+    let lastScrollY = window.scrollY;
+    
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const isScrollingUp = currentScrollY < lastScrollY;
+      
+      // Update last scroll position
+      lastScrollY = currentScrollY;
+      
+      // Only hide when scrolling up AND reaching header area
+      if (isScrollingUp && currentScrollY <= HEADER_THRESHOLD) {
+        // Hide calendar if it's open
+        if (showCalendar) {
+          setShowCalendar(false);
+        }
+        
+        // Check if any sessions are currently shown
+        const hasOpenSessions = subjects.some(subject => subject.showSessions);
+        if (hasOpenSessions) {
+          // Hide all open sessions and reset display limits
+          setSubjects(prevSubjects => 
+            prevSubjects.map(subject => ({
+              ...subject,
+              showSessions: false
+            }))
+          );
+          setSessionsDisplayLimit({});
+        }
+      }
+    };
+
+    // Add scroll event listener to window
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [subjects, showCalendar]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.dropdown-container')) {
+        setShowMonthDropdown(false);
+        setShowDayDropdown(false);
+        setShowYearDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const saveToUndoStack = () => {
     setUndoStack(prev => [...prev, { subjects: JSON.parse(JSON.stringify(subjects)), targetPercentage }]);
@@ -127,7 +191,21 @@ const AttendanceTracker = ({ onBack }) => {
   };
 
   const toggleShowSessions = (subjectId) => {
-    setSubjects(subjects.map(subject => subject.id === subjectId ? { ...subject, showSessions: !subject.showSessions } : subject));
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) return;
+
+    const currentLimit = sessionsDisplayLimit[subjectId] || 0;
+    const totalSessions = subject.sessions.length;
+    
+    if (!subject.showSessions) {
+      // First click: show first 5 sessions
+      setSubjects(subjects.map(s => s.id === subjectId ? { ...s, showSessions: true } : s));
+      setSessionsDisplayLimit(prev => ({ ...prev, [subjectId]: 5 }));
+    } else {
+      // Subsequent clicks: add 10 more sessions
+      const newLimit = Math.min(currentLimit + 10, totalSessions);
+      setSessionsDisplayLimit(prev => ({ ...prev, [subjectId]: newLimit }));
+    }
   };
 
   const calculateAttendance = (sessions) => {
@@ -141,7 +219,6 @@ const AttendanceTracker = ({ onBack }) => {
     return 'status-warning';
   };
 
-  const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (month, year) => new Date(year, month, 1).getDay();
   const fmt = (n) => (n < 10 ? `0${n}` : `${n}`);
   const toLocalDateString = (y, m, d) => `${y}-${fmt(m + 1)}-${fmt(d)}`; // m is 0-based
@@ -161,6 +238,67 @@ const AttendanceTracker = ({ onBack }) => {
         setCurrentMonth(currentMonth + 1);
       }
     }
+    // Adjust day if it's invalid for the new month
+    adjustDayForMonth();
+  };
+
+  const adjustDayForMonth = () => {
+    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+    setCurrentDay(prevDay => {
+      if (prevDay > daysInMonth) {
+        return daysInMonth;
+      }
+      if (prevDay < 1) {
+        return 1;
+      }
+      return prevDay;
+    });
+  };
+
+  // Adjust day when month or year changes
+  useEffect(() => {
+    adjustDayForMonth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMonth, currentYear]);
+
+  const handleMonthChange = (month) => {
+    setCurrentMonth(month);
+    adjustDayForMonth();
+    setShowMonthDropdown(false);
+  };
+
+  const handleDayChange = (day) => {
+    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+    if (day <= daysInMonth) {
+      setCurrentDay(day);
+    }
+    setShowDayDropdown(false);
+  };
+
+  const handleYearChange = (year) => {
+    setCurrentYear(year);
+    // Check if current day is valid for February in leap year
+    adjustDayForMonth();
+    setShowYearDropdown(false);
+  };
+
+  const getDaysInMonth = (month, year) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const getAvailableDays = () => {
+    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  };
+
+  const getAvailableYears = () => {
+    const currentYearValue = new Date().getFullYear();
+    return Array.from({ length: 10 }, (_, i) => currentYearValue - 5 + i);
   };
 
   const getDayStatusForSubject = (day) => {
@@ -240,28 +378,104 @@ const AttendanceTracker = ({ onBack }) => {
         <section className="calendar-grid-section">
           <div className="calendar-controls">
             <div className="controls-content">
-              <div className="control-group">
-                <label className="control-label">Subject</label>
-                <select
-                  className="subject-select"
-                  value={selectedSubjectForCalendar}
-                  onChange={(e) => setSelectedSubjectForCalendar(e.target.value)}
-                >
-                  <option value="">Select a subject</option>
-                  {subjects.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="control-group">
-                <label className="control-label">Month</label>
-                <div className="month-navigation">
-                  <button className="btn-nav" onClick={() => navigateMonth('prev')}>‹ Prev</button>
-                  <div className="current-month">
-                    {new Date(currentYear, currentMonth).toLocaleString(undefined, { month: 'long', year: 'numeric' })}
+              <div className="control-group date-row-group">
+                <div className="date-row-container">
+                  <div className="dropdown-container subject-dropdown">
+                    <select
+                      className="subject-select pill-select"
+                      value={selectedSubjectForCalendar}
+                      onChange={(e) => setSelectedSubjectForCalendar(e.target.value)}
+                    >
+                      <option value="">Select subject</option>
+                      {subjects.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
                   </div>
-                  <button className="btn-nav" onClick={() => navigateMonth('next')}>Next ›</button>
+
+                  <div className="dropdown-container date-dropdown">
+                    <label className="date-label">Day</label>
+                    <button 
+                      className="pill-dropdown-btn"
+                      onClick={() => {
+                        setShowDayDropdown(!showDayDropdown);
+                        setShowMonthDropdown(false);
+                        setShowYearDropdown(false);
+                      }}
+                    >
+                      {currentDay}
+                      <span className="dropdown-arrow">▼</span>
+                    </button>
+                    {showDayDropdown && (
+                      <div className="pill-dropdown-menu day-dropdown">
+                        {getAvailableDays().map((day) => (
+                          <button
+                            key={day}
+                            className={`pill-dropdown-item ${day === currentDay ? 'active' : ''}`}
+                            onClick={() => handleDayChange(day)}
+                          >
+                            {day}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="dropdown-container month-dropdown">
+                    <label className="date-label">Month</label>
+                    <button 
+                      className="pill-dropdown-btn"
+                      onClick={() => {
+                        setShowMonthDropdown(!showMonthDropdown);
+                        setShowDayDropdown(false);
+                        setShowYearDropdown(false);
+                      }}
+                    >
+                      {monthNames[currentMonth]}
+                      <span className="dropdown-arrow">▼</span>
+                    </button>
+                    {showMonthDropdown && (
+                      <div className="pill-dropdown-menu month-menu-grid">
+                        {monthNames.map((month, index) => (
+                          <button
+                            key={index}
+                            className={`pill-dropdown-item ${index === currentMonth ? 'active' : ''}`}
+                            onClick={() => handleMonthChange(index)}
+                          >
+                            {month}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="dropdown-container year-dropdown">
+                    <label className="date-label">Year</label>
+                    <button 
+                      className="pill-dropdown-btn"
+                      onClick={() => {
+                        setShowYearDropdown(!showYearDropdown);
+                        setShowMonthDropdown(false);
+                        setShowDayDropdown(false);
+                      }}
+                    >
+                      {currentYear}
+                      <span className="dropdown-arrow">▼</span>
+                    </button>
+                    {showYearDropdown && (
+                      <div className="pill-dropdown-menu year-menu">
+                        {getAvailableYears().map((year) => (
+                          <button
+                            key={year}
+                            className={`pill-dropdown-item ${year === currentYear ? 'active' : ''}`}
+                            onClick={() => handleYearChange(year)}
+                          >
+                            {year}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -367,23 +581,40 @@ const AttendanceTracker = ({ onBack }) => {
                     <div className="history-header">
                       <h4 className="history-title">All Sessions ({subject.sessions.length})</h4>
                       <button className="btn-toggle-sessions" onClick={() => toggleShowSessions(subject.id)}>
-                        {subject.showSessions ? '▲ Hide' : '▼ Show'}
+                        {subject.showSessions ? '▲ Hide' : '▼ Show More'}
                       </button>
                     </div>
-                    {subject.showSessions && (
-                      <div className="sessions-list">
-                        {subject.sessions.map((session) => (
-                          <div key={session.id} className="session-item">
-                            <span className="session-date">{session.date}</span>
-                            <span className={`session-status status-${session.status}`}>
-                              {session.isExtra && '⭐ Extra - '}
-                              {session.status === 'present' ? '✓ Present' : '✗ Absent'}
-                            </span>
-                            <button className="btn-delete-session" onClick={() => handleDeleteSession(subject.id, session.id)} title="Delete session">🗑</button>
+                    {subject.showSessions && (() => {
+                      const displayLimit = sessionsDisplayLimit[subject.id] || 5;
+                      const displayedSessions = subject.sessions.slice(0, displayLimit);
+                      const hasMore = subject.sessions.length > displayLimit;
+                      const remaining = subject.sessions.length - displayLimit;
+                      
+                      return (
+                        <>
+                          <div className="sessions-list">
+                            {displayedSessions.map((session) => (
+                              <div key={session.id} className="session-item">
+                                <span className="session-date">{session.date}</span>
+                                <span className={`session-status ${session.isExtra ? 'status-extra' : `status-${session.status}`}`}>
+                                  {session.isExtra ? 'Extra' : session.status === 'present' ? 'Present' : 'Absent'}
+                                </span>
+                                <button className="btn-delete-session" onClick={() => handleDeleteSession(subject.id, session.id)} title="Delete session">🗑</button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          {hasMore ? (
+                            <button className="btn-toggle-sessions" onClick={() => toggleShowSessions(subject.id)} style={{ marginTop: '0.5rem', width: '100%' }}>
+                              Show More ({remaining} remaining)
+                            </button>
+                          ) : (
+                            <div style={{ textAlign: 'center', marginTop: '0.5rem', fontSize: '0.7rem', color: '#666' }}>
+                              All sessions displayed
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

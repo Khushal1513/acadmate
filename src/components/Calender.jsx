@@ -209,11 +209,19 @@ const Calendar = ({ onBack }) => {
           {events.filter(event=>new Date(event.date)>=new Date()).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,6)
             .map(event=>(
               <div key={event.id} className={`event-card ${event.type}`}>
-                <div className="event-info">
-                  <strong>{event.title}</strong>
-                  <span className="event-date">{new Date(event.date).toLocaleDateString()}</span>
-                  {event.isCollege && <span className="college-badge">College Event</span>}
+                <div className="event-info-row">
+                  <strong className="event-title">{event.title}</strong>
+                  <span className="event-date-badge">{new Date(event.date).toLocaleDateString()}</span>
+                  <span className="event-type-badge">{event.type}</span>
+                  {event.isCollege && <span className="college-badge">College</span>}
                 </div>
+                <button 
+                  className="event-delete-btn"
+                  onClick={() => deleteEvent(event.id)}
+                  title="Delete event"
+                >
+                  🗑️
+                </button>
               </div>
             ))
           }
