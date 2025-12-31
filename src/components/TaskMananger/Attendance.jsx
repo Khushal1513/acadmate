@@ -1,183 +1,252 @@
 /**
- * Attendify - Attendance Tracking Component
+ * Attendify - Attendance Tracking Component (Firebase + API)
  */
 
-import React, { useState, useEffect } from 'react';
-import './AttendanceTracker.css';
+import React, { useState, useEffect } from "react";
+import "./AttendanceTracker.css";
+import ApiService from "../../services/api";
 
 const AttendanceTracker = ({ onBack }) => {
+  const [user, setUser] = useState(null);
+
   const [subjects, setSubjects] = useState([]);
   const [targetPercentage, setTargetPercentage] = useState(75);
-  const [newSubjectName, setNewSubjectName] = useState('');
-  const [undoStack, setUndoStack] = useState([]);
+  const [newSubjectName, setNewSubjectName] = useState("");
   const [selectedDates, setSelectedDates] = useState({});
+  const [undoStack, setUndoStack] = useState([]);
+
   const [showCalendar, setShowCalendar] = useState(false);
-  const [selectedSubjectForCalendar, setSelectedSubjectForCalendar] = useState('');
+  const [selectedSubjectForCalendar, setSelectedSubjectForCalendar] = useState("");
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
+  /* ============================
+     INITIAL LOAD (USER + DATA)
+  ============================ */
   useEffect(() => {
-    const savedData = localStorage.getItem('attendanceTrackerData');
-    if (savedData) {
-      const parsed = JSON.parse(savedData);
-      setSubjects(parsed.subjects || []);
-      setTargetPercentage(parsed.targetPercentage || 75);
-    }
+    const init = async () => {
+      try {
+        const me = await ApiService.getMe();
+        setUser(me.user);
+
+        const subjectNames = await ApiService.getSubjects(me.user.id);
+
+        const baseSubjects = subjectNames.map((name) => ({
+          id: name,
+          name,
+          sessions: [],
+          showAttendanceForm: false,
+          showSessions: false,
+        }));
+
+        setSubjects(baseSubjects);
+
+        const records = await ApiService.getAttendance(me.user.id);
+        hydrateSessions(baseSubjects, records);
+      } catch (err) {
+        console.error("Attendance load failed:", err);
+      }
+    };
+
+    init();
   }, []);
 
-  // By default, do not auto-select subject; calendar remains empty until user selects
+  /* ============================
+     MAP DB RECORDS → UI
+  ============================ */
+  const hydrateSessions = (baseSubjects, records) => {
+    setSubjects(
+      baseSubjects.map((subj) => ({
+        ...subj,
+        sessions: records
+          .filter((r) => r.subject === subj.name)
+          .map((r) => ({
+            id: `${r.date}_${r.status}`,
+            date: r.date,
+            status: r.status,
+            isExtra: false,
+          }))
+          .sort((a, b) => new Date(b.date) - new Date(a.date)),
+      }))
+    );
+  };
 
-  useEffect(() => {
-    const dataToSave = { subjects, targetPercentage };
-    localStorage.setItem('attendanceTrackerData', JSON.stringify(dataToSave));
-  }, [subjects, targetPercentage]);
-
+  /* ============================
+     UNDO SUPPORT (UI ONLY)
+  ============================ */
   const saveToUndoStack = () => {
-    setUndoStack(prev => [...prev, { subjects: JSON.parse(JSON.stringify(subjects)), targetPercentage }]);
+    setUndoStack((prev) => [
+      ...prev,
+      JSON.parse(JSON.stringify(subjects)),
+    ]);
   };
 
   const handleUndo = () => {
-    if (undoStack.length > 0) {
-      const lastState = undoStack[undoStack.length - 1];
-      setSubjects(lastState.subjects);
-      setTargetPercentage(lastState.targetPercentage);
-      setUndoStack(prev => prev.slice(0, -1));
-    }
+    if (!undoStack.length) return;
+    setSubjects(undoStack[undoStack.length - 1]);
+    setUndoStack((prev) => prev.slice(0, -1));
   };
 
-  const handleAddSubject = () => {
-    if (newSubjectName.trim()) {
-      const normalized = newSubjectName.trim().toLowerCase();
-      const exists = subjects.some(s => (s.name || '').trim().toLowerCase() === normalized);
-      if (exists) {
-        alert('This subject has already been added.');
-        return;
-      }
-      saveToUndoStack();
-      const newSubject = {
-        id: Date.now().toString(),
+  /* ============================
+     SUBJECT MANAGEMENT
+  ============================ */
+  const handleAddSubject = async () => {
+    if (!newSubjectName.trim() || !user) return;
+
+    const exists = subjects.some(
+      (s) => s.name.toLowerCase() === newSubjectName.trim().toLowerCase()
+    );
+    if (exists) {
+      alert("Subject already exists");
+      return;
+    }
+
+    saveToUndoStack();
+
+    const updated = [
+      ...subjects,
+      {
+        id: newSubjectName.trim(),
         name: newSubjectName.trim(),
         sessions: [],
         showAttendanceForm: false,
-        showSessions: false
-      };
-      setSubjects([...subjects, newSubject]);
-      setNewSubjectName('');
-    }
+        showSessions: false,
+      },
+    ];
+
+    setSubjects(updated);
+    setNewSubjectName("");
+
+    await ApiService.syncSubjects(
+      user.id,
+      updated.map((s) => s.name)
+    );
   };
 
-  const handleRemoveSubject = (subjectId) => {
+  const handleRemoveSubject = async (subjectId) => {
     saveToUndoStack();
-    setSubjects(subjects.filter(s => s.id !== subjectId));
+
+    const updated = subjects.filter((s) => s.id !== subjectId);
+    setSubjects(updated);
+
+    await ApiService.syncSubjects(
+      user.id,
+      updated.map((s) => s.name)
+    );
   };
 
-  const handleMarkAttendance = (subjectId, status, isExtra = false) => {
-    saveToUndoStack();
-    const date = selectedDates[subjectId] || new Date().toISOString().split('T')[0];
+  /* ============================
+     ATTENDANCE ACTIONS
+  ============================ */
+  const handleMarkAttendance = async (subjectId, status) => {
+    if (!user) return;
 
-    setSubjects(subjects.map(subject => {
-      if (subject.id === subjectId) {
-        if (isExtra) {
-          const newSession = {
-            id: Date.now().toString() + Math.random(),
-            date,
-            status,
-            isExtra: true
-          };
-          return {
-            ...subject,
-            sessions: [...subject.sessions, newSession].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          };
-        } else {
-          const existingRegularIndex = subject.sessions.findIndex(s => s.date === date && !s.isExtra);
-          if (existingRegularIndex >= 0) {
-            const updatedSessions = [...subject.sessions];
-            updatedSessions[existingRegularIndex] = { ...updatedSessions[existingRegularIndex], status };
-            return { ...subject, sessions: updatedSessions };
-          } else {
-            const newSession = {
-              id: Date.now().toString() + Math.random(),
-              date,
-              status,
-              isExtra: false
-            };
-            return {
-              ...subject,
-              sessions: [...subject.sessions, newSession].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            };
-          }
-        }
-      }
-      return subject;
-    }));
+    const date =
+      selectedDates[subjectId] ||
+      new Date().toISOString().split("T")[0];
+
+    await ApiService.markAttendance({
+      userId: user.id,
+      subject: subjectId,
+      date,
+      status,
+    });
+
+    const records = await ApiService.getAttendance(user.id);
+    hydrateSessions(subjects, records);
   };
 
-  const handleDeleteSession = (subjectId, sessionId) => {
-    saveToUndoStack();
-    setSubjects(subjects.map(subject => {
-      if (subject.id === subjectId) {
-        return { ...subject, sessions: subject.sessions.filter(s => s.id !== sessionId) };
-      }
-      return subject;
-    }));
-  };
+  const handleDeleteSession = async (subjectId, sessionDate, sessionStatus) => {
+  if (!window.confirm("Delete this session?")) return;
+  
+  saveToUndoStack();
 
-  const toggleAttendanceForm = (subjectId) => {
-    setSubjects(subjects.map(subject => subject.id === subjectId ? { ...subject, showAttendanceForm: !subject.showAttendanceForm } : subject));
-  };
+  try {
+    await ApiService.deleteAttendanceSession(
+      user.id,
+      subjectId,
+      sessionDate,
+      sessionStatus
+    );
 
-  const toggleShowSessions = (subjectId) => {
-    setSubjects(subjects.map(subject => subject.id === subjectId ? { ...subject, showSessions: !subject.showSessions } : subject));
-  };
+    const records = await ApiService.getAttendance(user.id);
+    hydrateSessions(subjects, records);
+    
+    console.log("✅ Session deleted successfully");
+  } catch (err) {
+    console.error("❌ Failed to delete session:", err);
+    alert("Failed to delete session. Please try again.");
+  }
+};
 
+  /* ============================
+     UI HELPERS (UNCHANGED)
+  ============================ */
   const calculateAttendance = (sessions) => {
-    if (sessions.length === 0) return 0;
-    const presentCount = sessions.filter(s => s.status === 'present').length;
-    return Math.round((presentCount / sessions.length) * 100);
-    };
-
-  const getStatusClass = (percentage) => {
-    if (percentage >= targetPercentage) return 'status-good';
-    return 'status-warning';
+    if (!sessions.length) return 0;
+    const present = sessions.filter((s) => s.status === "present").length;
+    return Math.round((present / sessions.length) * 100);
   };
 
-  const getDaysInMonth = (month, year) => new Date(year, month + 1, 0).getDate();
-  const getFirstDayOfMonth = (month, year) => new Date(year, month, 1).getDay();
+  const getStatusClass = (percentage) =>
+    percentage >= targetPercentage ? "status-good" : "status-warning";
+
+  const getDaysInMonth = (m, y) => new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (m, y) => new Date(y, m, 1).getDay();
+
   const fmt = (n) => (n < 10 ? `0${n}` : `${n}`);
-  const toLocalDateString = (y, m, d) => `${y}-${fmt(m + 1)}-${fmt(d)}`; // m is 0-based
-  const navigateMonth = (direction) => {
-    if (direction === 'prev') {
-      if (currentMonth === 0) {
-        setCurrentMonth(11);
-        setCurrentYear(currentYear - 1);
-      } else {
-        setCurrentMonth(currentMonth - 1);
-      }
+  const toLocalDateString = (y, m, d) => `${y}-${fmt(m + 1)}-${fmt(d)}`;
+
+  const navigateMonth = (dir) => {
+    if (dir === "prev") {
+      currentMonth === 0
+        ? (setCurrentMonth(11), setCurrentYear(currentYear - 1))
+        : setCurrentMonth(currentMonth - 1);
     } else {
-      if (currentMonth === 11) {
-        setCurrentMonth(0);
-        setCurrentYear(currentYear + 1);
-      } else {
-        setCurrentMonth(currentMonth + 1);
-      }
+      currentMonth === 11
+        ? (setCurrentMonth(0), setCurrentYear(currentYear + 1))
+        : setCurrentMonth(currentMonth + 1);
     }
   };
 
   const getDayStatusForSubject = (day) => {
     if (!selectedSubjectForCalendar) return null;
-    // Use local YYYY-MM-DD to match input[type=date] values and stored session dates
     const dateStr = toLocalDateString(currentYear, currentMonth, day);
-    const subj = subjects.find(s => s.id === selectedSubjectForCalendar);
+    const subj = subjects.find((s) => s.id === selectedSubjectForCalendar);
     if (!subj) return null;
-    const daySessions = subj.sessions.filter(s => s.date === dateStr);
-    if (daySessions.length === 0) return null;
-    const hasPresent = daySessions.some(s => s.status === 'present');
-    const hasAbsent = daySessions.some(s => s.status === 'absent');
-    const hasOnlyExtra = daySessions.every(s => s.isExtra);
-    if (hasPresent && hasAbsent) return 'mixed';
-    if (hasOnlyExtra) return 'extra';
-    return hasPresent ? 'present' : 'absent';
+
+    const daySessions = subj.sessions.filter((s) => s.date === dateStr);
+    if (!daySessions.length) return null;
+
+    const hasPresent = daySessions.some((s) => s.status === "present");
+    const hasAbsent = daySessions.some((s) => s.status === "absent");
+    if (hasPresent && hasAbsent) return "mixed";
+    return hasPresent ? "present" : "absent";
   };
+
+  // ============================
+//  UI TOGGLES
+// ============================
+const toggleAttendanceForm = (subjectId) => {
+  setSubjects((prev) =>
+    prev.map((s) =>
+      s.id === subjectId
+        ? { ...s, showAttendanceForm: !s.showAttendanceForm }
+        : s
+    )
+  );
+};
+
+const toggleShowSessions = (subjectId) => {
+  setSubjects((prev) =>
+    prev.map((s) =>
+      s.id === subjectId
+        ? { ...s, showSessions: !s.showSessions }
+        : s
+    )
+  );
+};
+
 
   return (
     <div className="attendance-tracker">

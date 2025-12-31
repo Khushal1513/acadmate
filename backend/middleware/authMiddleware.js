@@ -1,24 +1,47 @@
-const jwt = require('jsonwebtoken');
-const { db } = require('../config/firebase');
+// middleware/authMiddleware.js
+const jwt = require("jsonwebtoken");
+const { db } = require("../config/firebase");
 
-const authMiddleware = async (req, res, next) => {
+module.exports = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ message: 'No token provided' });
+    const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userDoc = await db.collection('users').doc(decoded.id).get();
+    const userId = decoded.id || decoded.userId;
 
-    if (!userDoc.exists) return res.status(401).json({ message: 'Invalid token' });
+    if (!userId) {
+      return res.status(401).json({ message: "Invalid token payload" });
+    }
+
+    const userDoc = await db.collection("users").doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(401).json({ message: "User not found" });
+    }
 
     const userData = userDoc.data();
-    if (!userData.isActive) return res.status(401).json({ message: 'Account deactivated' });
 
-    req.user = { id: userDoc.id, ...userData };
+    req.user = {
+      id: userDoc.id,
+      username: userData.username,
+      usn: userData.usn,
+      branch: userData.branch,
+      section: userData.section,
+      email: userData.email,
+      phone: userData.phone,
+    };
+
+    // ✅ CRITICAL: Call next() to continue to the route handler
     next();
   } catch (err) {
-    res.status(401).json({ message: 'Authentication failed' });
+    console.error("Auth Middleware Error:", err.message);
+    return res.status(401).json({ 
+      message: "Invalid or expired token",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
-
-module.exports = authMiddleware;

@@ -151,10 +151,6 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           password: formData.password,
         });
 
-        // Store token + user in local storage
-        localStorage.setItem("token", response.token);
-        localStorage.setItem("user", JSON.stringify(response.user));
-
         // Notify parent
         onLogin(response.user);
         onClose();

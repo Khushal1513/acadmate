@@ -1,50 +1,54 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
-import './Calendar.css'
 
-const Calendar = ({ onBack }) => {
-  const [events, setEvents] = useState([
-    { id: 1, title: 'Fee Due Date', date: '2025-02-15', type: 'fee', isCollege: true },
-    { id: 2, title: 'Mid-term Exams', date: '2025-02-20', type: 'exam', isCollege: true },
-    { id: 3, title: 'Sports Day', date: '2025-02-28', type: 'event', isCollege: true }
-  ])
+import React, { useState, useEffect } from "react";
+import "./Calendar.css";
+import ApiService from "../services/api";
 
-  const [user, setUser] = useState(null)
-  const [newEvent, setNewEvent] = useState({ title: '', date: '', type: 'event' })
-  const [notification, setNotification] = useState('')
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+const Calendar = ({ user, onBack }) => {
+  // Enhanced debug logging
+  const [events, setEvents] = useState([]);
+  const [newEvent, setNewEvent] = useState({
+    title: "",
+    date: "",
+    type: "event",
+  });
+  const [notification, setNotification] = useState("");
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  /* ---------------- FETCH EVENTS ---------------- */
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      if (!parsed.id) return alert("User ID missing. Please log in again.");
-      setUser(parsed);
+    // Check for .id OR .uid (common in different auth providers)
+    const userId = user?.id || user?.uid;
+    
+    if (!userId) {
+      console.error("No userId found in user object:", user);
+      setError("User ID not found. Please try logging in again.");
+      setIsLoading(false);
+      return;
     }
-  }, []);
 
-  // Fetch events for user
-  useEffect(() => {
-    if (!user) return;
     const fetchEvents = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/reminder/user/${user.id}`);
-        const data = Array.isArray(res.data.events) ? res.data.events : [];
+        setIsLoading(true);
+        setError(null);
+        
+        const res = await ApiService.getUserReminders(userId);
+        
+        const data = Array.isArray(res.events) ? res.events : [];
 
-        // 🧹 Auto-delete past events (before today)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         const futureEvents = [];
+
         for (const event of data) {
-          const eventDate = new Date(event.date + "T00:00:00");
+          const eventDate = new Date(`${event.date}T00:00:00`);
           if (eventDate < today) {
-            // Delete expired event from backend
             try {
-              await axios.delete(`http://localhost:5000/api/reminder/${event.id}`);
-              console.log(`Deleted past event: ${event.title}`);
+              await ApiService.deleteReminder(event.id);
             } catch (err) {
-              console.error(`Failed to delete past event ${event.id}:`, err);
+              console.error("Failed to delete expired event:", err);
             }
           } else {
             futureEvents.push(event);
@@ -54,55 +58,97 @@ const Calendar = ({ onBack }) => {
         setEvents(futureEvents);
       } catch (err) {
         console.error("Error fetching events:", err);
+        setError("Failed to load events. Please try again.");
         setEvents([]);
+      } finally {
+        setIsLoading(false);
       }
     };
+
     fetchEvents();
   }, [user]);
 
-  // Fee notifications within 7 days
+  /* ---------------- FEE NOTIFICATION ---------------- */
   useEffect(() => {
     if (!events.length) return;
+
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const feeEvents = events.filter(
       (e) =>
-        e?.type === "fee" &&
+        e.type === "fee" &&
         e.date &&
-        new Date(e.date + "T00:00:00") > today &&
-        new Date(e.date + "T00:00:00") <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+        new Date(`${e.date}T00:00:00`) > today &&
+        new Date(`${e.date}T00:00:00`) <=
+          new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
     );
 
     if (feeEvents.length > 0) {
-      setNotification(`⚠️ Fee due in ${Math.ceil((new Date(feeEvents[0].date) - today) / (1000 * 60 * 60 * 24))} days!`)
-      setTimeout(() => setNotification(''), 5000)
+      const daysLeft = Math.ceil(
+        (new Date(feeEvents[0].date) - today) / (1000 * 60 * 60 * 24)
+      );
+
+      setNotification(`⚠️ Fee due in ${daysLeft} days!`);
+
+      const timer = setTimeout(() => setNotification(""), 5000);
+      return () => clearTimeout(timer);
     }
-  }, [events])
+  }, [events]);
 
+  /* ---------------- ADD EVENT ---------------- */
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') addEvent()
-  }
+    if (e.key === "Enter") addEvent();
+  };
 
-  const addEvent = () => {
-    if (!newEvent.title || !newEvent.date) return;
+  const addEvent = async () => {
+    const userId = user?.id || user?.uid;
+    if (!newEvent.title || !newEvent.date || !userId) {
+      alert("Please fill in all fields");
+      return;
+    }
 
-    // Disallow past dates
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const eventDate = new Date(`${newEvent.date}T00:00:00`);
     if (eventDate < today) {
-      alert('Please select today or a future date.');
+      alert("Please select today or a future date.");
       return;
     }
 
-    setEvents([...events, { id: Date.now(), ...newEvent, isCollege: false }]);
-    setNewEvent({ title: '', date: '', type: 'event' });
-  }
+    try {
+      const saved = await ApiService.addReminder({
+        userId: userId,
+        email: user.email,
+        title: newEvent.title,
+        date: newEvent.date,
+        type: newEvent.type,
+      });
 
-  // Delete event manually
+      setEvents((prev) => [
+        ...prev,
+        {
+          id: saved.id,
+          title: saved.title,
+          date: saved.date,
+          type: saved.type,
+          isCollege: false,
+        },
+      ]);
+
+      setNewEvent({ title: "", date: "", type: "event" });
+    } catch (err) {
+      console.error("Failed to save event:", err);
+      alert("Failed to save event");
+    }
+  };
+
+  /* ---------------- DELETE EVENT (manual) ---------------- */
   const deleteEvent = async (eventId) => {
     if (!window.confirm("Delete this event?")) return;
+
     try {
-      await axios.delete(`http://localhost:5000/api/reminder/${eventId}`);
+      await ApiService.deleteReminder(eventId);
       setEvents((prev) => prev.filter((e) => e.id !== eventId));
     } catch (err) {
       console.error("Failed to delete:", err);
@@ -110,60 +156,134 @@ const Calendar = ({ onBack }) => {
     }
   };
 
+  /* ---------------- DATE HELPERS ---------------- */
   const getDaysInMonth = (date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDayOfWeek = firstDay.getDay()
-    
-    const days = []
-    for (let i = 0; i < startingDayOfWeek; i++) days.push(null)
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
+    for (let i = 0; i < startingDayOfWeek; i++) days.push(null);
+
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-      const dayEvents = events.filter(event => event.date === dateStr)
-      days.push({ day, events: dayEvents })
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+        day
+      ).padStart(2, "0")}`;
+      const dayEvents = events.filter((event) => event.date === dateStr);
+      days.push({ day, events: dayEvents });
     }
-    return days
+    return days;
+  };
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  // Loading State
+  if (!user) {
+    return (
+      <div className="calendar-container">
+        <div className="loading-spinner">
+          <p>No user data available. Please log in again.</p>
+          {onBack && (
+            <button onClick={onBack} className="btn">
+              Go Back
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
-  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-  const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  if (isLoading) {
+    return (
+      <div className="calendar-container">
+        <div className="loading-spinner">
+          <p>Loading your calendar...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="calendar-container">
+        <div className="error-message">
+          <p>{error}</p>
+          {onBack && (
+            <button onClick={onBack} className="btn">
+              Go Back
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="calendar-container">
-  <h2 className="calendar-title">
-   {/* prefer public asset if available */}
-  <img src={'/calendar.png'} onError={(e)=>{e.currentTarget.onerror=null; e.currentTarget.src='/logo.png'}} alt="EventBuddy Icon" className="calendar-icon" />
-   EventBuddy
-  </h2>
-
+      <h2 className="calendar-title">
+        <img
+          src="/calendar.png"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "/logo.png";
+          }}
+          alt="EventBuddy Icon"
+          className="calendar-icon"
+        />
+        EventBuddy
+      </h2>
 
       {notification && <div className="notification">{notification}</div>}
 
-      {/* Add Event Form */}
       <div className="event-form-section">
         <h3>Add New Event</h3>
         <div className="event-form">
           <div className="form-row">
             <div className="input-group">
               <label htmlFor="event-title">Event Title</label>
-              <input id="event-title" type="text" placeholder="Enter event title" 
-                value={newEvent.title} onChange={(e)=>setNewEvent({...newEvent,title:e.target.value})} 
-                onKeyPress={handleKeyPress} className="form-input" />
+              <input
+                id="event-title"
+                type="text"
+                placeholder="Enter event title"
+                value={newEvent.title}
+                onChange={(e) =>
+                  setNewEvent({ ...newEvent, title: e.target.value })
+                }
+                onKeyPress={handleKeyPress}
+                className="form-input"
+              />
             </div>
+
             <div className="input-group">
               <label htmlFor="event-date">Date</label>
-              <input id="event-date" type="date" 
-                value={newEvent.date} onChange={(e)=>setNewEvent({...newEvent,date:e.target.value})} 
-                className="form-input" />
+              <input
+                id="event-date"
+                type="date"
+                value={newEvent.date}
+                onChange={(e) =>
+                  setNewEvent({ ...newEvent, date: e.target.value })
+                }
+                className="form-input"
+              />
             </div>
+
             <div className="input-group">
               <label htmlFor="event-type">Type</label>
-              <select id="event-type" value={newEvent.type} 
-                onChange={(e)=>setNewEvent({...newEvent,type:e.target.value})} 
-                className="form-input">
+              <select
+                id="event-type"
+                value={newEvent.type}
+                onChange={(e) =>
+                  setNewEvent({ ...newEvent, type: e.target.value })
+                }
+                className="form-input"
+              >
                 <option value="event">Event</option>
                 <option value="exam">Exam</option>
                 <option value="assignment">Assignment</option>
@@ -171,56 +291,116 @@ const Calendar = ({ onBack }) => {
                 <option value="other">Other</option>
               </select>
             </div>
-            <button onClick={addEvent} className="btn btn-add">Add Event</button>
+
+            <button onClick={addEvent} className="btn btn-add">
+              Add Event
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Calendar Navigation */}
       <div className="calendar-nav-section">
         <div className="calendar-nav">
-          <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1))} className="btn nav-btn">←</button>
-          <h3>{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</h3>
-          <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1))} className="btn nav-btn">→</button>
+          <button
+            onClick={() =>
+              setCurrentMonth(
+                new Date(
+                  currentMonth.getFullYear(),
+                  currentMonth.getMonth() - 1
+                )
+              )
+            }
+            className="btn nav-btn"
+          >
+            ←
+          </button>
+
+          <h3>
+            {monthNames[currentMonth.getMonth()]}{" "}
+            {currentMonth.getFullYear()}
+          </h3>
+
+          <button
+            onClick={() =>
+              setCurrentMonth(
+                new Date(
+                  currentMonth.getFullYear(),
+                  currentMonth.getMonth() + 1
+                )
+              )
+            }
+            className="btn nav-btn"
+          >
+            →
+          </button>
         </div>
       </div>
 
-      {/* Calendar Grid */}
       <div className="calendar-grid-section">
         <div className="calendar-grid">
-          {weekDays.map(day=><div key={day} className="calendar-header-day">{day}</div>)}
-          {getDaysInMonth(currentMonth).map((day,index)=>(
-            <div key={index} className={`calendar-day ${day?.events?.length?'has-event':''}`}>
-              {day && <>
-                <div className="day-number">{day.day}</div>
-                {day.events.map(event=>(
-                  <div key={event.id} className={`event-item ${event.type}`}>{event.title}{event.isCollege && <span className="college-badge">📚</span>}</div>
-                ))}
-              </>}
+          {weekDays.map((day) => (
+            <div key={day} className="calendar-header-day">
+              {day}
+            </div>
+          ))}
+
+          {getDaysInMonth(currentMonth).map((day, index) => (
+            <div
+              key={index}
+              className={`calendar-day ${
+                day?.events?.length ? "has-event" : ""
+              }`}
+            >
+              {day && (
+                <>
+                  <div className="day-number">{day.day}</div>
+                  {day.events.map((event) => (
+                    <div
+                      key={event.id}
+                      className={`event-item ${event.type}`}
+                      onDoubleClick={() => deleteEvent(event.id)}
+                    >
+                      {event.title}
+                      {event.isCollege && (
+                        <span className="college-badge">📚</span>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Upcoming Events */}
       <div className="upcoming-events-section">
         <h3>Upcoming Events</h3>
         <div className="events-grid">
-          {events.filter(event=>new Date(event.date)>=new Date()).sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,6)
-            .map(event=>(
-              <div key={event.id} className={`event-card ${event.type}`}>
-                <div className="event-info">
-                  <strong>{event.title}</strong>
-                  <span className="event-date">{new Date(event.date).toLocaleDateString()}</span>
-                  {event.isCollege && <span className="college-badge">College Event</span>}
+          {events.length === 0 ? (
+            <p>No upcoming events. Add one above!</p>
+          ) : (
+            events
+              .filter((event) => new Date(event.date) >= new Date())
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .slice(0, 6)
+              .map((event) => (
+                <div key={event.id} className={`event-card ${event.type}`}>
+                  <div className="event-info">
+                    <strong>{event.title}</strong>
+                    <span className="event-date">
+                      {new Date(event.date).toLocaleDateString()}
+                    </span>
+                    {event.isCollege && (
+                      <span className="college-badge">College Event</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
-          }
+              ))
+          )}
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Calendar
+export default Calendar;

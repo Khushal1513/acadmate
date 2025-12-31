@@ -2,7 +2,9 @@ import React from 'react'
 import Calendar from './Calender.jsx'
 import './styles.css'
 
-const CalendarPage = ({ onBackToHome }) => {
+const CalendarPage = ({ user, onBackToHome }) => {
+  // Debug log to verify user prop is received
+
   return (
     <>
       <style>
@@ -472,7 +474,7 @@ const CalendarPage = ({ onBackToHome }) => {
           </div> */}
           {/* Main content area for calendar component */}
           <div className="page-content">
-            <Calendar onBack={onBackToHome} />
+            <Calendar user={user} onBack={onBackToHome} />
           </div>
         </div>
       </div>

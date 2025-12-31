@@ -1,223 +1,111 @@
 import React, { useState, useEffect, useRef } from "react";
-import { auth, db } from "../firebase";
-import {
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-} from "firebase/firestore";
-import SeniorsProfiles from "./SeniorsProfiles.jsx";
+import { auth } from "../firebase"; // ✅ client auth ONLY
 
 const SeniorsPage = ({ onBackToHome }) => {
-  const bannedWords = ["none","nothing"
-];
+  const bannedWords = ["none", "nothing"];
 
+  const containsBadWord = (text) =>
+    bannedWords.some((word) => text.toLowerCase().includes(word));
 
-function containsBadWord(text) {
-  const lower = text.toLowerCase();
-  return bannedWords.some(word => lower.includes(word));
-}
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const messagesEndRef = useRef(null);
   const [canSend, setCanSend] = useState(true);
+  const messagesEndRef = useRef(null);
 
-useEffect(() => {
-  let timer;
-  if (!canSend) {
-    timer = setTimeout(() => setCanSend(true), 3000); // 3s cooldown
-  }
-  return () => clearTimeout(timer);
-}, [canSend]);
-
-  // 🔄 Fetch messages live from Firestore (ordered oldest → newest)
+  // ⏱️ Cooldown
   useEffect(() => {
-    const q = query(collection(db, "broadcasts"), orderBy("timestamp", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
+    if (!canSend) {
+      const timer = setTimeout(() => setCanSend(true), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [canSend]);
+
+  // 🔄 Fetch messages from backend
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/seniors");
+        const data = await res.json();
+        setMessages(data);
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      }
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000); // polling
+    return () => clearInterval(interval);
   }, []);
 
-
-  // 🚀 Send message to Firestore
+  // 🚀 Send message via backend
   const sendMessage = async (e) => {
-  e.preventDefault();
-  if (containsBadWord(message)) {
-    alert("⚠️ Please avoid using inappropriate or harmful language.");
-    return; // stop sending
-  }
+    e.preventDefault();
 
-  if (!message) return;
-  if (!canSend) {
-    alert("⏳ Please wait a few seconds before sending another message.");
-    return;
-  }
+    if (!message.trim()) return;
+    if (!canSend) return alert("⏳ Please wait before sending again.");
+    if (containsBadWord(message))
+      return alert("⚠️ Please avoid inappropriate language.");
 
-  try {
-    await addDoc(collection(db, "broadcasts"), {
-      text: message,
-      email: auth.currentUser?.email,
-      timestamp: serverTimestamp(),
-    });
-    setMessage("");
-    setCanSend(false); 
-  } catch (error) {
-    console.error("Error sending message:", error);
-  }
-};
+    try {
+      await fetch("http://localhost:5000/api/seniors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: message,
+          email: auth.currentUser?.email,
+        }),
+      });
 
+      setMessage("");
+      setCanSend(false);
+    } catch (err) {
+      console.error("Error sending message:", err);
+    }
+  };
 
   return (
-    <>
-      <style>{`
-        :root {
-          --accent: #f4b30c;
-          --beige: #fbf9f1;
-          --brown: #1a1200;
-        }
-        .broadcast-page {
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
-          background: linear-gradient(135deg, var(--beige), #fdfcf8);
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          color: var(--brown);
-          align-items: center;
-        }
-        .broadcast-header {
-          text-align: center;
-          padding: 1rem;
-          font-size: 1.8rem;
-          font-weight: 700;
-          color: #f4b30c;
-          letter-spacing: 1px;
-        }
-        .broadcast-container {
-          flex: 1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          width: 100%;
-          padding: 1rem;
-        }
-        .broadcast-chat {
-          width: 75%;
-          height: 80vh;
-          display: flex;
-          flex-direction: column;
-          background: #fbf9f1;
-          overflow: hidden;
-        }
-        .broadcast-messages {
-          flex: 1;
-          padding: 1rem;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-        .broadcast-message {
-          max-width: 75%;
-          padding: 0.8rem 1rem;
-          border-radius: 12px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-          animation: fadeInUp 0.5s ease forwards;
-          word-wrap: break-word;
-        }
-        .user-msg {
-          align-self: flex-end;
-          background: linear-gradient(135deg, #667eea, #5a67f2);
-          color: white;
-        }
-        .other-msg {
-          align-self: flex-start;
-          background: #ddd9c5;
-          color: black;
-        }
-        .broadcast-input-area {
-          display: flex;
-          border-top: 1px solid #ddd9c5;
-          padding: 0.8rem;
-          background: white;
-        }
-        .broadcast-input {
-          flex: 1;
-          padding: 0.7rem;
-          border: 1px solid #ccc;
-          border-radius: 12px;
-          outline: none;
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
-          transition: box-shadow 0.3s ease;
-          font-size: 1rem;
-        }
-        .broadcast-input:focus {
-          box-shadow: 0 0 5px var(--accent);
-        }
-        .broadcast-btn {
-          margin-left: 0.6rem;
-          padding: 0.7rem 1.4rem;
-          border: none;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #f4b30c, #ff8c42);
-          color: white;
-          font-weight: bold;
-          cursor: pointer;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-          transition: transform 0.2s ease;
-        }
-        .broadcast-btn:hover {
-          transform: scale(1.05);
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+    <div className="broadcast-page">
+      <header className="broadcast-header">
+        📡 Community Broadcast Room
+      </header>
 
-      <div className="broadcast-page">
-        <header className="broadcast-header">📡 Community Broadcast Room</header>
-
-        <div className="broadcast-container">
-          <div className="broadcast-chat">
-            <div className="broadcast-messages" id="messagesBox">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`broadcast-message ${msg.email === auth.currentUser?.email ? "user-msg" : "other-msg"
-                    }`}
-                >
-                  <strong>{msg.email?.split("@")[0] || "Guest"}:</strong> {msg.text}
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <form onSubmit={sendMessage} className="broadcast-input-area">
-              <textarea
-                placeholder="Type your message..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault(); // prevent newline
-                    sendMessage(e); // send the message
-                  }
-                }}
-                className="broadcast-input"
-                rows={1}
-              />
-
-              <button type="submit" className="broadcast-btn">
-                Send
-              </button>
-            </form>
+      <div className="broadcast-container">
+        <div className="broadcast-chat">
+          <div className="broadcast-messages">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`broadcast-message ${
+                  msg.email === auth.currentUser?.email
+                    ? "user-msg"
+                    : "other-msg"
+                }`}
+              >
+                <strong>{msg.email?.split("@")[0] || "Guest"}:</strong>{" "}
+                {msg.text}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
+
+          <form onSubmit={sendMessage} className="broadcast-input-area">
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Type your message..."
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage(e);
+                }
+              }}
+            />
+            <button type="submit">Send</button>
+          </form>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
