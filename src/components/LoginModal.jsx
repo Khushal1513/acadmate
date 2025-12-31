@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import "./Register.css";
-import ApiService from "../services/api";
+import { authAPI as ApiService } from "../services/api";
 
 export default function LoginModal({ isOpen, onClose, onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -150,11 +150,13 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
         });
 
         // Store token + user in local storage
-        localStorage.setItem("token", response.token);
-        localStorage.setItem("user", JSON.stringify(response.user));
+        const token = response.data?.token || response.token;
+        const user = response.data?.user || response.user;
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", JSON.stringify(user));
 
         // Notify parent
-        onLogin(response.user);
+        onLogin(user);
         onClose();
       }
     } catch (err) {
