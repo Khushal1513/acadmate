@@ -1,13 +1,13 @@
-import React, { useState } from "react";
-import { X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Eye, EyeOff } from "lucide-react";
 import "./Register.css";
-import ApiService from "../services/api";
+import { authAPI as ApiService } from "../services/api";
 
 export default function LoginModal({ isOpen, onClose, onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [formKey, setFormKey] = useState(0);
-  const [inputsReadOnly, setInputsReadOnly] = useState(true);
+  
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -17,9 +17,24 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
     section: "",
     email: "",
     phone: "",
+    otp: "",
+    newPassword: "",
+    confirmNewPassword: "",
   });
 
   const [error, setError] = useState({ message: "", field: "" });
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOTP, setSendingOTP] = useState(false);
+  const [verifyingOTP, setVerifyingOTP] = useState(false);
+  const [submittingForm, setSubmittingForm] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  
+  // Password visibility states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   const branches = [
     "Biotechnology",
@@ -50,23 +65,239 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
     return null;
   };
 
+  // Send OTP (for registration or forgot password)
+  const handleSendOTP = async () => {
+    if (!formData.email || !formData.email.trim()) {
+      setError({ message: "Please enter your email first.", field: "email" });
+      return;
+    }
+
+    if (!formData.email.toLowerCase().endsWith("@gmail.com")) {
+      setError({
+        message: "Please provide a valid @gmail.com email address.",
+        field: "email",
+      });
+      return;
+    }
+
+    setSendingOTP(true);
+    setError({ message: "", field: "" });
+
+    try {
+      // If this is forgot-password flow, require valid new password before sending OTP
+      if (isForgotPassword) {
+        const passwordError = validatePassword(formData.newPassword);
+        if (passwordError) {
+          setError({ message: passwordError, field: "newPassword" });
+          setSendingOTP(false);
+          return;
+        }
+        if (formData.newPassword !== formData.confirmNewPassword) {
+          setError({ message: "New passwords do not match.", field: "confirmNewPassword" });
+          setSendingOTP(false);
+          return;
+        }
+        await ApiService.sendForgotPasswordOTP(formData.email);
+      } else {
+        await ApiService.sendOTP(formData.email);
+      }
+      setOtpSent(true);
+      setOtpVerified(false);
+      setResendTimer(60); // 60 seconds countdown
+      setError({
+        message: "✅ OTP sent to your email! Please check your inbox.",
+        field: "",
+      });
+    } catch (err) {
+      setError({ message: err.message || "Failed to send OTP", field: "email" });
+    } finally {
+      setSendingOTP(false);
+    }
+  };
+
+  // Verify OTP (for registration or forgot password)
+  const handleVerifyOTP = async () => {
+    if (!formData.otp || formData.otp.length !== 6) return;
+
+    setVerifyingOTP(true);
+    setError({ message: "", field: "" });
+
+    try {
+      if (isForgotPassword) {
+        await ApiService.verifyForgotPasswordOTP(formData.email, formData.otp);
+      } else {
+        await ApiService.verifyOTP(formData.email, formData.otp);
+      }
+      setOtpVerified(true);
+      setResendTimer(0);
+      setError({ message: "✅ OTP verified successfully!", field: "" });
+    } catch (err) {
+      // Handle rate limit errors with a better message
+      if (err.status === 429 || err.message?.includes("Too many")) {
+        setError({ 
+          message: "Too many verification attempts. Please wait a moment and try again.", 
+          field: "otp" 
+        });
+      } else {
+        setError({ message: err.message || "Invalid OTP. Please check and try again.", field: "otp" });
+      }
+    } finally {
+      setVerifyingOTP(false);
+    }
+  };
+
+  // Handle Forgot Password Form Submit
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError({ message: "", field: "" });
+
+    try {
+      // Validate email
+      if (!formData.email || !formData.email.trim()) {
+        setError({ message: "Please enter your email.", field: "email" });
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.email.toLowerCase().endsWith("@gmail.com")) {
+        setError({
+          message: "Please provide a valid @gmail.com email address.",
+          field: "email",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate OTP verification
+      if (!otpVerified) {
+        setError({
+          message: "Please verify your email with OTP before resetting password.",
+          field: "otp",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate new password
+      const passwordError = validatePassword(formData.newPassword);
+      if (passwordError) {
+        setError({ message: passwordError, field: "newPassword" });
+        setLoading(false);
+        return;
+      }
+
+      if (formData.newPassword !== formData.confirmNewPassword) {
+        setError({
+          message: "New passwords do not match.",
+          field: "confirmNewPassword",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Ensure OTP is present
+      if (!formData.otp || formData.otp.length !== 6) {
+        setError({
+          message: "OTP is required. Please verify your OTP again.",
+          field: "otp",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Reset password
+      await ApiService.resetPassword({
+        email: formData.email,
+        newPassword: formData.newPassword,
+        otp: formData.otp,
+      });
+
+      // Success message + switch to login
+      setError({
+        message: "✅ Password reset successfully! Please login with your new password.",
+        field: "",
+      });
+
+      setIsForgotPassword(false);
+      setOtpSent(false);
+      setOtpVerified(false);
+      setResendTimer(0);
+
+      // Reset form
+      setFormData({
+        username: "",
+        password: "",
+        confirmPassword: "",
+        usn: "",
+        branch: "",
+        section: "",
+        email: "",
+        phone: "",
+        otp: "",
+        newPassword: "",
+        confirmNewPassword: "",
+      });
+
+      // Clear success message automatically and switch to login after 2 seconds
+      setTimeout(() => {
+        setError({ message: "", field: "" });
+      }, 3000);
+    } catch (err) {
+      if (err.data?.errors && Array.isArray(err.data.errors)) {
+        setError({
+          message: err.data.errors[0].msg,
+          field: err.data.errors[0].param || "",
+        });
+      } else if (err.data?.message) {
+        setError({ message: err.data.message, field: "" });
+      } else if (err.message) {
+        setError({ message: err.message, field: "" });
+      } else {
+        setError({ message: "Something went wrong. Please try again.", field: "" });
+      }
+      console.error('Reset password error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  // Resend timer countdown
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
+
   // Handle Form Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (loading) return;
+    if (loading) {
+      console.log('Form submission blocked: already loading');
+      return;
+    }
+    
+    // Handle forgot password separately
+    if (isForgotPassword) {
+      handleForgotPasswordSubmit(e);
+      return;
+    }
+    
+    console.log('Form submitted:', { isRegistering, otpVerified, email: formData.email });
     setLoading(true);
     setError({ message: "", field: "" });
 
     try {
       if (isRegistering) {
         // --- Validation ---
-        for (const key in formData) {
-          if (
-            Object.prototype.hasOwnProperty.call(formData, key) &&
-            String(formData[key]).trim() === ""
-          ) {
+        // Only check required registration fields (exclude forgot password fields)
+        const requiredFields = ['username', 'usn', 'email', 'password', 'confirmPassword', 'branch', 'section', 'phone'];
+        for (const key of requiredFields) {
+          if (!formData[key] || String(formData[key]).trim() === "") {
             setError({
-              message: "Please fill in all required fields.",
+              message: `Please fill in ${key === 'usn' ? 'USN' : key.charAt(0).toUpperCase() + key.slice(1)}.`,
               field: key,
             });
             setLoading(false);
@@ -108,8 +339,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           return;
         }
 
-        const phoneRegex = /^(91)?[0-9]{10}$/;
-        if (!phoneRegex.test(formData.phone)) {
+        // Validate phone number (remove non-digits first, then check length)
+        const phoneDigits = formData.phone.replace(/\D/g, '');
+        if (phoneDigits.length !== 10 && phoneDigits.length !== 12) {
           setError({
             message: "Please enter a valid 10 or 12-digit phone number.",
             field: "phone",
@@ -118,8 +350,46 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           return;
         }
 
+        // Check if OTP was sent
+        if (!otpSent) {
+          setError({
+            message: "Please click 'Send OTP' button first to send OTP to your email.",
+            field: "email",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Check OTP verification
+        if (!otpVerified) {
+          setError({
+            message: "Please verify your email with OTP before registering.",
+            field: "otp",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Ensure OTP is present
+        if (!formData.otp || formData.otp.length !== 6) {
+          setError({
+            message: "OTP is required for registration. Please verify your OTP again.",
+            field: "otp",
+          });
+          setLoading(false);
+          return;
+        }
+
         // --- API Call: Register ---
         const { confirmPassword, ...submissionData } = formData;
+        // Explicitly include OTP in registration request (required for backend verification)
+        submissionData.otp = formData.otp;
+        console.log('Registering with data:', { 
+          email: submissionData.email, 
+          hasOTP: !!submissionData.otp, 
+          otpLength: submissionData.otp?.length,
+          otpVerified 
+        });
         await ApiService.register(submissionData);
 
         // Success message + switch to login
@@ -129,6 +399,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
         });
 
         setIsRegistering(false);
+        setOtpSent(false);
+        setOtpVerified(false);
+        setResendTimer(0);
 
         // Reset form
         setFormData({
@@ -140,6 +413,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           section: "",
           email: "",
           phone: "",
+          otp: "",
         });
 
         // Clear success message automatically
@@ -151,21 +425,33 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           password: formData.password,
         });
 
+        // Store token + user in local storage
+        const token = response.data?.token || response.token;
+        const user = response.data?.user || response.user;
+        localStorage.setItem("token", token);
+        localStorage.setItem("user", JSON.stringify(user));
+
         // Notify parent
-        onLogin(response.user);
+        onLogin(user);
         onClose();
       }
     } catch (err) {
-      if (err.response?.data?.errors) {
+      // Handle validation errors from express-validator
+      if (err.data?.errors && Array.isArray(err.data.errors)) {
         setError({
-          message: err.response.data.errors[0].msg,
-          field: err.response.data.errors[0].param,
+          message: err.data.errors[0].msg,
+          field: err.data.errors[0].param || "",
         });
-      } else if (err.response?.data?.message) {
-        setError({ message: err.response.data.message, field: "" });
+      } else if (err.data?.message) {
+        // Handle error messages from backend
+        setError({ message: err.data.message, field: "" });
+      } else if (err.message) {
+        // Handle other errors
+        setError({ message: err.message, field: "" });
       } else {
-        setError({ message: err.message || "Something went wrong.", field: "" });
+        setError({ message: "Something went wrong. Please try again.", field: "" });
       }
+      console.error('Registration error:', err);
     } finally {
       setLoading(false);
     }
@@ -173,51 +459,33 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
 
   // Handle Input Changes
   const handleInputChange = (e) => {
-    // Extract field name without formKey suffix
-    const fieldName = e.target.name.replace(/-\d+$/, '');
-    setFormData({ ...formData, [fieldName]: e.target.value });
+    const { name, value } = e.target;
+    // Only allow numbers for OTP
+    if (name === "otp") {
+      const numericValue = value.replace(/\D/g, "");
+      setFormData({ ...formData, [name]: numericValue });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
     if (error.message) setError({ message: "", field: "" });
   };
 
-  // Reset form whenever modal closes
-  const resetForm = () => {
-    setFormData({
-      username: "",
-      password: "",
-      confirmPassword: "",
-      usn: "",
-      branch: "",
-      section: "",
-      email: "",
-      phone: "",
-    });
-    setError({ message: "", field: "" });
-    setIsRegistering(false);
-    setLoading(false);
-  };
-
-  React.useEffect(() => {
-    if (isOpen) {
-      resetForm();
-      setInputsReadOnly(true);
-      setFormKey((k) => k + 1); // force DOM inputs to remount and drop autofill
-      // Some browsers re-apply autofill after initial render; clear again shortly after open.
-      const timer1 = setTimeout(() => {
-        resetForm();
-        setFormKey((k) => k + 1);
-      }, 50);
-      const timer2 = setTimeout(() => {
-        resetForm();
-        setInputsReadOnly(false); // Allow input after clearing attempts
-      }, 200);
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-      };
-    } else {
-      setInputsReadOnly(true);
+  // Reset OTP state when switching modes or closing
+  useEffect(() => {
+    if (!isOpen) {
+      setIsForgotPassword(false);
+      setOtpSent(false);
+      setOtpVerified(false);
+      setResendTimer(0);
+      setFormData((prev) => ({ ...prev, otp: "", newPassword: "", confirmNewPassword: "" }));
     }
-  }, [isOpen]);
+    if (!isRegistering && !isForgotPassword) {
+      setOtpSent(false);
+      setOtpVerified(false);
+      setResendTimer(0);
+      setFormData((prev) => ({ ...prev, otp: "", newPassword: "", confirmNewPassword: "" }));
+    }
+  }, [isOpen, isRegistering, isForgotPassword]);
 
   if (!isOpen) return null;
 
@@ -228,7 +496,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold custom-brown">
-              {isRegistering ? "Register" : "Login"}
+              {isForgotPassword ? "Forgot Password" : isRegistering ? "Register" : "Login"}
             </h2>
             <button
               onClick={onClose}
@@ -239,17 +507,147 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           </div>
 
           {/* Form */}
-          <form
-            key={formKey}
-            onSubmit={handleSubmit}
-            className="space-y-4"
-            autoComplete="off"
-            name={`login-register-form-${formKey}`}
-          >
-            {/* Hidden dummy inputs to confuse browser autofill */}
-            <input type="text" name="fake-email" autoComplete="off" style={{ position: 'absolute', left: '-9999px', opacity: 0 }} tabIndex={-1} />
-            <input type="password" name="fake-password" autoComplete="off" style={{ position: 'absolute', left: '-9999px', opacity: 0 }} tabIndex={-1} />
-            
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Forgot Password Form */}
+            {isForgotPassword ? (
+              <>
+                {/* Email (first) */}
+                <div>
+                  <label className="block text-sm font-medium custom-brown mb-2">
+                    Email
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      disabled={otpSent && !otpVerified}
+                      className={`flex-1 px-3 py-2 border rounded-lg ${
+                        error.field === "email"
+                          ? "border-red-500"
+                          : otpVerified
+                          ? "border-green-500"
+                          : "border-gray-300"
+                      } ${otpSent && !otpVerified ? "bg-gray-100" : ""}`}
+                    />
+                    {/* Send OTP moved to the end of the forgot-password section */}
+                  </div>
+                  {error.field === "email" && (
+                    <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                  )}
+                </div>
+
+                {/* New Password (second) */}
+                <div>
+                  <label className="block text-sm font-medium custom-brown mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      name="newPassword"
+                      value={formData.newPassword}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 pr-10 border rounded-lg ${
+                        error.field === "newPassword" ? "border-red-500" : "border-gray-300"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {error.field === "newPassword" && (
+                    <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium custom-brown mb-2">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmNewPassword ? "text" : "password"}
+                      name="confirmNewPassword"
+                      value={formData.confirmNewPassword}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 pr-10 border rounded-lg ${
+                        error.field === "confirmNewPassword" ? "border-red-500" : "border-gray-300"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showConfirmNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {error.field === "confirmNewPassword" && (
+                    <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                  )}
+                </div>
+
+                {/* Send OTP button (placed after password fields) */}
+                <div className="flex justify-end">
+                  {!otpVerified && (
+                    <button
+                      type="button"
+                      onClick={handleSendOTP}
+                      disabled={sendingOTP || resendTimer > 0}
+                      className="px-4 py-2 bg-accent text-brown font-semibold rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    >
+                      {sendingOTP ? "Sending..." : resendTimer > 0 ? `Resend (${resendTimer}s)` : "Send OTP"}
+                    </button>
+                  )}
+
+                  {otpVerified && (
+                    <div className="px-4 py-2 bg-green-100 text-green-700 font-semibold rounded-lg flex items-center whitespace-nowrap">
+                      ✅ Verified
+                    </div>
+                  )}
+                </div>
+
+                {/* OTP Input (shown when OTP is sent but not verified) */}
+                {otpSent && !otpVerified && (
+                  <div>
+                    <label className="block text-sm font-medium custom-brown mb-2">
+                      Enter OTP
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="otp"
+                        value={formData.otp}
+                        onChange={handleInputChange}
+                        placeholder="Enter 6-digit OTP"
+                        maxLength={6}
+                        className={`flex-1 px-3 py-2 border rounded-lg ${
+                          error.field === "otp" ? "border-red-500" : "border-gray-300"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOTP}
+                        disabled={loading || !formData.otp || formData.otp.length !== 6}
+                        className="px-4 py-2 bg-accent text-brown font-semibold rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {loading ? "Verifying..." : "Verify OTP"}
+                      </button>
+                    </div>
+                    {error.field === "otp" && (
+                      <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
             {isRegistering && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -261,7 +659,6 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
-                    autoComplete="off"
                     className={`w-full px-3 py-2 border rounded-lg ${
                       error.field === "username"
                         ? "border-red-500"
@@ -281,7 +678,6 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
                     name="usn"
                     value={formData.usn}
                     onChange={handleInputChange}
-                    autoComplete="off"
                     className={`w-full px-3 py-2 border rounded-lg ${
                       error.field === "usn"
                         ? "border-red-500"
@@ -302,57 +698,102 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
               </label>
               <input
                 type="email"
-                name={`email-${formKey}`}
-                id={`email-${formKey}`}
+                name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                autoComplete="off"
-                readOnly={inputsReadOnly}
-                onFocus={(e) => {
-                  if (e.target.readOnly) {
-                    e.target.readOnly = false;
-                    setInputsReadOnly(false);
-                  }
-                }}
+                disabled={isRegistering && otpSent && !otpVerified}
                 className={`w-full px-3 py-2 border rounded-lg ${
                   error.field === "email"
                     ? "border-red-500"
+                    : otpVerified
+                    ? "border-green-500"
                     : "border-gray-300"
-                }`}
+                } ${isRegistering && otpSent && !otpVerified ? "bg-gray-100" : ""}`}
               />
+              {isRegistering && otpVerified && (
+                <div className="mt-2 px-3 py-2 bg-green-100 text-green-700 font-semibold rounded-lg flex items-center">
+                  ✅ Email Verified
+                </div>
+              )}
               {error.field === "email" && (
                 <p className="text-red-500 text-sm mt-1">{error.message}</p>
               )}
             </div>
+
+            {/* OTP Input (only shown when OTP is sent but not verified) */}
+            {isRegistering && otpSent && !otpVerified && (
+              <div>
+                <label className="block text-sm font-medium custom-brown mb-2">
+                  Enter OTP
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="otp"
+                    value={formData.otp}
+                    onChange={handleInputChange}
+                    maxLength={6}
+                    placeholder="Enter 6-digit OTP"
+                    className={`flex-1 px-3 py-2 border rounded-lg ${
+                      error.field === "otp"
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyOTP}
+                    disabled={loading || !formData.otp || formData.otp.length !== 6}
+                    className="px-4 py-2 bg-accent text-brown font-semibold rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {loading ? "Verifying..." : "Verify OTP"}
+                  </button>
+                </div>
+                {error.field === "otp" && (
+                  <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                )}
+              </div>
+            )}
 
             {/* Password + Confirm Password */}
             <div
               className={isRegistering ? "grid grid-cols-1 md:grid-cols-2 gap-4" : ""}
             >
               <div>
-                <label className="block text-sm font-medium custom-brown mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  name={`password-${formKey}`}
-                  id={`password-${formKey}`}
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  autoComplete="new-password"
-                  readOnly={inputsReadOnly}
-                  onFocus={(e) => {
-                    if (e.target.readOnly) {
-                      e.target.readOnly = false;
-                      setInputsReadOnly(false);
-                    }
-                  }}
-                  className={`w-full px-3 py-2 border rounded-lg ${
-                    error.field === "password"
-                      ? "border-red-500"
-                      : "border-gray-300"
-                  }`}
-                />
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium custom-brown">
+                    Password
+                  </label>
+                  {!isRegistering && !isForgotPassword && (
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotPassword(true)}
+                      className="text-sm text-accent hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 pr-10 border rounded-lg ${
+                      error.field === "password"
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {error.field === "password" && (
                   <p className="text-red-500 text-sm mt-1">{error.message}</p>
                 )}
@@ -362,26 +803,26 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
                   <label className="block text-sm font-medium custom-brown mb-2">
                     Confirm Password
                   </label>
-                  <input
-                    type="password"
-                    name={`confirmPassword-${formKey}`}
-                    id={`confirmPassword-${formKey}`}
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    autoComplete="new-password"
-                    readOnly={inputsReadOnly}
-                    onFocus={(e) => {
-                      if (e.target.readOnly) {
-                        e.target.readOnly = false;
-                        setInputsReadOnly(false);
-                      }
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg ${
-                      error.field === "confirmPassword"
-                        ? "border-red-500"
-                        : "border-gray-300"
-                    }`}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className={`w-full px-3 py-2 pr-10 border rounded-lg ${
+                        error.field === "confirmPassword"
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                   {error.field === "confirmPassword" && (
                     <p className="text-red-500 text-sm mt-1">
                       {error.message}
@@ -465,7 +906,35 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
                   {error.field === "phone" && (
                     <p className="text-red-500 text-sm mt-1">{error.message}</p>
                   )}
-                </div>
+                  </div>
+
+                  {/* Send OTP Button - At the end of registration form */}
+                  {!otpSent && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleSendOTP}
+                        disabled={sendingOTP || !formData.email || !formData.email.trim()}
+                        className="w-full px-4 py-2 bg-accent text-brown font-semibold rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {sendingOTP ? "Sending OTP..." : "Send OTP"}
+                      </button>
+                      {!formData.email && (
+                        <p className="text-sm text-gray-500 mt-1">Please fill in all details above and click Send OTP</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* OTP Sent Status */}
+                  {otpSent && !otpVerified && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        ✅ OTP sent to your email! Please check your inbox and enter the OTP above.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
               </>
             )}
 
@@ -476,9 +945,13 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
               className="w-full custom-accent text-brown font-semibold py-3 rounded-lg hover:bg-yellow-500 transition-colors"
             >
               {loading
-                ? isRegistering
+                ? isForgotPassword
+                  ? "Resetting Password..."
+                  : isRegistering
                   ? "Registering..."
                   : "Logging in..."
+                : isForgotPassword
+                ? "Reset Password"
                 : isRegistering
                 ? "Register"
                 : "Login"}
@@ -500,17 +973,33 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
 
           {/* Toggle */}
           <div className="mt-6 text-center">
-            <p className="custom-brown opacity-70">
-              {isRegistering
-                ? "Already have an account?"
-                : "Don't have an account?"}
+            {isForgotPassword ? (
               <button
-                onClick={() => setIsRegistering(!isRegistering)}
-                className="ml-2 text-accent font-semibold hover:underline"
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setOtpSent(false);
+                  setOtpVerified(false);
+                  setResendTimer(0);
+                  setFormData((prev) => ({ ...prev, otp: "", newPassword: "", confirmNewPassword: "", email: "" }));
+                  setError({ message: "", field: "" });
+                }}
+                className="text-accent font-semibold hover:underline"
               >
-                {isRegistering ? "Login" : "Register"}
+                ← Back to Login
               </button>
-            </p>
+            ) : (
+              <p className="custom-brown opacity-70">
+                {isRegistering
+                  ? "Already have an account?"
+                  : "Don't have an account?"}
+                <button
+                  onClick={() => setIsRegistering(!isRegistering)}
+                  className="ml-2 text-accent font-semibold hover:underline"
+                >
+                  {isRegistering ? "Login" : "Register"}
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </div>

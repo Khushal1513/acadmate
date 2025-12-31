@@ -1,15 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ChatbotHub.css";
-import { QuickHelpCard } from "./QuickHelp";
-import { DeepDiveCard } from "./DeepDive";
-import { ExamPrepCard } from "./ExamPrep";
+import Lottie from "lottie-react";
 
 const ChatbotHub = () => {
-  const [activeMode, setActiveMode] = useState("eduboat");
+  const [activeMode, setActiveMode] = useState("examprep");
   const [messages, setMessages] = useState({
-    quickhelp: [{ type: "bot", text: "Welcome to QuickHelp! Get instant explanations ⚡" }],
-    examprep: [{ type: "bot", text: "Welcome to ExamPrep! Get exam-ready answers ✍️" }],
-    deepdive: [{ type: "bot", text: "Welcome to DeepDive! Explore concepts thoroughly 🌊" }]
+    examprep: [{ type: "bot", text: "Welcome to ExamPrep! Get exam-ready answers ✍️" }]
   });
 
   const [input, setInput] = useState("");
@@ -18,9 +14,9 @@ const ChatbotHub = () => {
   const [showMarksDropdown, setShowMarksDropdown] = useState(false);
 
   const chatboxRef = useRef(null);
-  const eduboatRef = useRef(null);
   const prevMessagesLengthRef = useRef(0);
   const isSendingRef = useRef(false);
+  const [examPrepAnimData, setExamPrepAnimData] = useState(null);
 
   // Measure navbar height at runtime and publish as CSS variable so landing can offset itself
   useEffect(() => {
@@ -39,15 +35,26 @@ const ChatbotHub = () => {
     return () => window.removeEventListener('resize', setNavHeight);
   }, []);
 
+  // Load ExamPrep animation
+  useEffect(() => {
+    fetch("/animations/examPrep.json")
+      .then((r) => r.json())
+      .then(setExamPrepAnimData)
+      .catch(() => setExamPrepAnimData(null));
+  }, []);
+
   const sendMessage = () => {
-    if (!input.trim()) return;
-    if (isSendingRef.current) return; // Prevent double-send from Strict Mode
+    const trimmedInput = input.trim();
+    if (!trimmedInput) return;
+    if (isSendingRef.current) return;
+
     isSendingRef.current = true;
 
-    const messageToSend = input;
-    const userMessage = activeMode === "examprep"
-      ? `${messageToSend} (${selectedMarks} marks)`
-      : messageToSend;
+    const messageToSend = trimmedInput;
+    const userMessage =
+      activeMode === "examprep"
+        ? `${messageToSend} (${selectedMarks} marks)`
+        : messageToSend;
 
     setMessages(prev => ({
       ...prev,
@@ -58,14 +65,15 @@ const ChatbotHub = () => {
     setShowMarksDropdown(false);
     setIsTyping(true);
 
-    const endpoint = "http://127.0.0.1:8000/ask";
-
     const payload = {
-      question: messageToSend,
+      query: messageToSend,   // ✅ FIXED
       marks: activeMode === "examprep" ? selectedMarks : 5,
+      temperature: 0.3
     };
 
-    fetch(endpoint, {
+    console.log("Sending payload:", payload); // 🔍 Debug
+
+    fetch("http://127.0.0.1:8000/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -73,7 +81,7 @@ const ChatbotHub = () => {
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json();
-          throw new Error(err.detail || "Error from server");
+          throw new Error(err.detail || "Server error");
         }
         return res.json();
       })
@@ -89,7 +97,7 @@ const ChatbotHub = () => {
           [activeMode]: [
             ...prev[activeMode],
             { type: "bot", text: `Error: ${error.message}` }
-          ],
+          ]
         }));
       })
       .finally(() => {
@@ -97,6 +105,7 @@ const ChatbotHub = () => {
         isSendingRef.current = false;
       });
   };
+
 
   const navigateToMode = (mode) => {
     setActiveMode(mode);
@@ -130,31 +139,14 @@ const ChatbotHub = () => {
   useEffect(() => {
     if (chatboxRef.current) {
       try {
-        chatboxRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        chatboxRef.current.scrollTo({ top: 0, behavior: 'smooth' });
       } catch {
         chatboxRef.current.scrollTop = 0;
       }
     }
 
     try {
-      if (activeMode === "eduboat") {
-        requestAnimationFrame(() => {
-          try {
-            if (eduboatRef.current) {
-              // compute navbar height and scroll so the eduboat container sits below it
-              const nav = document.querySelector('nav');
-              const navHeight = nav ? nav.offsetHeight : 0;
-              const extraGap = 8; // small buffer
-              const topY = eduboatRef.current.getBoundingClientRect().top + window.scrollY - navHeight - extraGap;
-              window.scrollTo({ top: Math.max(0, Math.round(topY)), behavior: 'auto' });
-            } else {
-              window.scrollTo({ top: 0, behavior: 'auto' });
-            }
-          } catch (e) {
-            try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
-          }
-        });
-      }
+      window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}
   }, [activeMode]);
 
@@ -184,13 +176,13 @@ const ChatbotHub = () => {
     window.history.replaceState(
       { section: "Chatbot" },
       "",
-      window.location.hash || "#Chatbot"
+      window.location.hash || "#Chatbot-examprep"
     );
 
     const onPop = (e) => {
       const state = e.state || {};
       if (state.section === "Chatbot") {
-        setActiveMode(state.chatbotMode || "eduboat");
+        setActiveMode(state.chatbotMode || "examprep");
       }
     };
 
@@ -198,47 +190,13 @@ const ChatbotHub = () => {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  useEffect(() => {
-    if (activeMode === "eduboat") {
-      const reveals = document.querySelectorAll(".reveal");
-      const handleScroll = () => {
-        for (let i = 0; i < reveals.length; i++) {
-          const windowHeight = window.innerHeight;
-          const elementTop = reveals[i].getBoundingClientRect().top;
-          const elementVisible = 100;
-
-          if (elementTop < windowHeight - elementVisible) {
-            reveals[i].classList.add("active");
-          } else {
-            reveals[i].classList.remove("active");
-          }
-        }
-      };
-
-      window.addEventListener("scroll", handleScroll);
-      handleScroll();
-      return () => window.removeEventListener("scroll", handleScroll);
-    }
-  }, [activeMode]);
 
   const getModeConfig = () => {
     switch (activeMode) {
-      case "quickhelp":
-        return {
-          name: "⚡ QuickHelp",
-          gradient: "linear-gradient(135deg, #a18cd1, #fbc2eb)",
-          userGradient: "linear-gradient(135deg, #42a5f5, #1e88e5)"
-        };
       case "examprep":
         return {
-          name: "📘 ExamPrep",
+          name: "ExamPrep",
           gradient: "linear-gradient(135deg, #667eea, #5a67f2)",
-          userGradient: "linear-gradient(135deg, #667eea, #5a67f2)"
-        };
-      case "deepdive":
-        return {
-          name: "🔍 DeepDive",
-          gradient: "linear-gradient(135deg, #ff7e5f, #feb47b)",
           userGradient: "linear-gradient(135deg, #667eea, #5a67f2)"
         };
       default:
@@ -271,39 +229,20 @@ const ChatbotHub = () => {
     return escaped;
   };
 
-  if (activeMode === "eduboat") {
-    return (
-      <div className="eduboat-container" ref={eduboatRef}>
-        <header className="header reveal">
-          <h1>AcadBoat</h1>
-          <p className="subtitle">Study made simple with smart support.</p>
-        </header>
-
-        <div className="card-section">
-          <div className="reveal" onClick={() => navigateToMode("quickhelp")}>
-            <QuickHelpCard />
-          </div>
-          <div className="reveal" onClick={() => navigateToMode("deepdive")}>
-            <DeepDiveCard />
-          </div>
-          <div className="reveal" onClick={() => navigateToMode("examprep")}>
-            <ExamPrepCard />
-          </div>
-        </div>
-
-        <footer className="footer reveal">✨ Happy learning!</footer>
-      </div>
-    );
-  }
 
   return (
     <div className="chatbot-hub">
       <header className="chatbot-header">
-        <h1>{modeConfig.name}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+          {activeMode === "examprep" && examPrepAnimData && (
+            <div style={{ width: '100px', height: '100px' }}>
+              <Lottie animationData={examPrepAnimData} loop autoplay style={{ width: '100%', height: '100%' }} />
+            </div>
+          )}
+          <h1>{modeConfig.name}</h1>
+        </div>
         <p className="chatbot-subtitle">
-          {activeMode === "quickhelp" && "Get instant explanations for quick understanding"}
-          {activeMode === "examprep" && "Structured answers and strategies for exam success"}
-          {activeMode === "deepdive" && "Comprehensive explanations with detailed insights"}
+          {activeMode === "examprep" ? "Structured answers and strategies for exam success" : "Ask your question"}
         </p>
       </header>
 

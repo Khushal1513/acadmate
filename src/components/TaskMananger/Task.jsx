@@ -37,17 +37,38 @@ function Task() {
   // State to manage which page is currently being displayed
   const [currentPage, setCurrentPage] = useState(() => getInitialPage())
   
+  // Track previous page to determine if we're navigating from home
+  const previousPageRef = useRef('home');
+  
   // Update URL when currentPage changes
   useEffect(() => {
     // Don't update URL on initial render
-    if (isInitialMount.current) return;
+    if (isInitialMount.current) {
+      previousPageRef.current = currentPage;
+      return;
+    }
     
     try {
+      const isNavigatingFromHome = previousPageRef.current === 'home' && currentPage !== 'home';
+      
       if (currentPage === 'home') {
+        // When going back to home, check if we need to use pushState or replaceState
+        // If previous page was grades/attendance, use replaceState (going back)
+        // Otherwise, might be initial navigation, use replaceState
         window.history.replaceState({ section: 'TaskManager' }, '', '#TaskManager');
       } else {
-        window.history.replaceState({ section: 'TaskManager' }, '', `#Task-${currentPage}`);
+        // When navigating FROM home TO grades/attendance, ALWAYS use pushState to keep home in history
+        // This ensures browser back button goes through Task Manager home first
+        if (isNavigatingFromHome) {
+          // Ensure we're pushing a new state, not replacing
+          window.history.pushState({ section: 'TaskManager' }, '', `#Task-${currentPage}`);
+        } else {
+          // Already on a sub-page, just update the URL
+          window.history.replaceState({ section: 'TaskManager' }, '', `#Task-${currentPage}`);
+        }
       }
+      
+      previousPageRef.current = currentPage;
     } catch (e) {
       console.error('Error updating URL:', e);
     }
@@ -659,22 +680,7 @@ function Task() {
   }, [])
 
   // Handle internal navigation within Task Manager
-  useEffect(() => {
-    // Skip on initial mount
-    if (isInitialMount.current) return;
-    
-    try {
-      // Only update URL if it doesn't already match
-      const currentHash = window.location.hash || '';
-      const expectedHash = currentPage === 'home' ? '#TaskManager' : `#Task-${currentPage}`;
-      
-      if (currentHash !== expectedHash) {
-        window.history.replaceState({ section: 'TaskManager' }, '', expectedHash);
-      }
-    } catch (e) {
-      console.error('Error updating navigation state:', e);
-    }
-  }, [currentPage])
+  // Note: This is now handled in the main useEffect above with pushState/replaceState logic
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -682,25 +688,49 @@ function Task() {
       const hash = window.location.hash || '';
       const state = e.state || {};
       
-      // If we're navigating to a non-TaskManager section, let App.jsx handle it
-      if (state.section && state.section !== 'TaskManager') {
+      // Check if this is a Task Manager related navigation
+      const isTaskManagerHash = hash === '#TaskManager' || hash.startsWith('#Task-');
+      const isTaskManagerState = state.section === 'TaskManager';
+      
+      // If we're currently on grades/attendance
+      if (currentPage === 'grades' || currentPage === 'attendance') {
+        // If hash is Task Manager related, handle internal navigation
+        if (isTaskManagerHash || isTaskManagerState) {
+          if (hash === '#TaskManager' || (hash === '' && isTaskManagerState)) {
+            setCurrentPage('home');
+          } else if (hash.includes('#Task-')) {
+            const hashPage = hash.replace('#Task-', '');
+            if (['grades', 'attendance', 'home'].includes(hashPage)) {
+              setCurrentPage(hashPage);
+            }
+          }
+        } else {
+          // Hash is not Task Manager - user clicked back and browser skipped Task Manager home
+          // This shouldn't happen if pushState worked correctly, but handle it anyway
+          // Go to Task Manager home
+          setCurrentPage('home');
+          window.history.replaceState({ section: 'TaskManager' }, '', '#TaskManager');
+        }
         return;
       }
       
       // Handle Task Manager internal navigation
-      if (hash === '#TaskManager' || hash === '') {
-        setCurrentPage('home');
-      } else if (hash.includes('#Task-')) {
-        const hashPage = hash.replace('#Task-', '');
-        if (['grades', 'attendance', 'home'].includes(hashPage)) {
-          setCurrentPage(hashPage);
+      if (isTaskManagerHash || isTaskManagerState) {
+        if (hash === '#TaskManager' || (hash === '' && isTaskManagerState)) {
+          setCurrentPage('home');
+        } else if (hash.includes('#Task-')) {
+          const hashPage = hash.replace('#Task-', '');
+          if (['grades', 'attendance', 'home'].includes(hashPage)) {
+            setCurrentPage(hashPage);
+          }
         }
       }
     };
     
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [])
+    // Use capture phase to handle before App.jsx
+    window.addEventListener('popstate', onPopState, true);
+    return () => window.removeEventListener('popstate', onPopState, true);
+  }, [currentPage])
 
   /**
    * HomePage Component
