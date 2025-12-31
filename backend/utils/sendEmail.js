@@ -1,15 +1,23 @@
 // utils/sendEmail.js
+require('dotenv').config();
 const nodemailer = require("nodemailer");
 const { db } = require("../config/firebase");
+
+// Helper function to get Gmail password (removes spaces)
+const getGmailPassword = () => {
+  const password = process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_PASS;
+  // Remove spaces from app password (Gmail app passwords sometimes have spaces)
+  return password ? password.replace(/\s+/g, '') : password;
+};
 
 // ✅ Gmail transporter setup
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.GMAIL_USER, // your Gmail address
-    pass: process.env.GMAIL_APP_PASSWORD, // App Password
+    user: process.env.GMAIL_USER || process.env.EMAIL_USER, // your Gmail address
+    pass: getGmailPassword(), // App Password (spaces removed)
   },
-   tls: {
+  tls: {
     rejectUnauthorized: false, // ✅ Ignore self-signed certificate errors
   },
 });
@@ -17,8 +25,9 @@ const transporter = nodemailer.createTransport({
 // ✅ General sendEmail utility
 const sendEmail = async ({ to, subject, text, html }) => {
   try {
+    const fromEmail = process.env.GMAIL_USER || process.env.EMAIL_USER || process.env.SENDGRID_FROM_EMAIL;
     await transporter.sendMail({
-      from: process.env.GMAIL_USER,
+      from: `"AcadMate" <${fromEmail}>`,
       to,
       subject,
       text,
@@ -27,6 +36,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     console.log(`✅ Email sent to ${to}: ${subject}`);
   } catch (error) {
     console.error("❌ Error sending email:", error.message);
+    throw error; // Re-throw so callers can handle errors
   }
 };
 

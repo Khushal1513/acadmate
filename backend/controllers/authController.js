@@ -184,4 +184,145 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login, sendOTP, verifyOTPCode };
+// FORGOT PASSWORD - SEND OTP
+const sendForgotPasswordOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if email exists in the database
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('email', '==', normalizedEmail).get();
+    
+    if (snapshot.empty) {
+      // Don't reveal if email exists for security, just send success message
+      return res.json({ 
+        message: 'If the email exists, OTP will be sent to your email' 
+      });
+    }
+
+    // Generate and store OTP
+    const otp = generateOTP();
+    storeOTP(normalizedEmail, otp);
+
+    // Send OTP email
+    try {
+      await sendOTPEmail(normalizedEmail, otp);
+    } catch (emailError) {
+      console.error('Email sending error:', emailError);
+      throw new Error('Failed to send email. Please check email configuration.');
+    }
+
+    res.json({ 
+      message: 'If the email exists, OTP has been sent to your email',
+      email: normalizedEmail 
+    });
+  } catch (err) {
+    console.error('Send forgot password OTP failed:', err);
+    const errorMessage = err.message || 'Failed to send OTP. Please try again.';
+    res.status(500).json({ message: errorMessage });
+  }
+};
+
+// FORGOT PASSWORD - VERIFY OTP
+const verifyForgotPasswordOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: 'Email and OTP are required' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = verifyOTP(normalizedEmail, otp);
+
+    if (!result.valid) {
+      return res.status(400).json({ message: result.message });
+    }
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (err) {
+    console.error('Verify forgot password OTP failed:', err);
+    res.status(500).json({ message: 'OTP verification failed' });
+  }
+};
+
+// FORGOT PASSWORD - RESET PASSWORD
+const resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword, otp } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    if (!newPassword || newPassword.trim().length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if OTP was verified
+    const alreadyVerified = isOTPVerified(normalizedEmail);
+    
+    if (!alreadyVerified) {
+      // If not verified, try to verify now with provided OTP
+      if (!otp || !otp.trim()) {
+        return res.status(400).json({ 
+          message: 'OTP verification is required. Please verify your email first or provide OTP.' 
+        });
+      }
+      
+      const otpResult = verifyOTP(normalizedEmail, otp.trim());
+      if (!otpResult.valid) {
+        return res.status(400).json({ 
+          message: otpResult.message || 'OTP not found or expired. Please verify your email again.' 
+        });
+      }
+    }
+
+    // Find user by email
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('email', '==', normalizedEmail).get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const userDoc = snapshot.docs[0];
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in Firestore
+    await userDoc.ref.update({
+      password: hashedPassword,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Delete OTP after successful password reset
+    deleteOTP(normalizedEmail);
+
+    res.json({ 
+      message: 'Password reset successfully. Please login with your new password.' 
+    });
+  } catch (err) {
+    console.error('Reset password failed:', err);
+    res.status(500).json({ message: 'Password reset failed' });
+  }
+};
+
+module.exports = { 
+  register, 
+  login, 
+  sendOTP, 
+  verifyOTPCode,
+  sendForgotPasswordOTP,
+  verifyForgotPasswordOTP,
+  resetPassword
+};

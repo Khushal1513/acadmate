@@ -15,6 +15,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.GMAIL_USER || process.env.EMAIL_USER, // Your Gmail address
     pass: getGmailPassword(), // Your Gmail App Password (spaces removed)
   },
+  tls: {
+    rejectUnauthorized: false, // Ignore self-signed certificate errors
+  },
 });
 
 // Send OTP email
