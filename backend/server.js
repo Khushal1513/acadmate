@@ -17,57 +17,67 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:3000", "http://localhost:5174"],
+    origin: ["http://localhost:5173", "http://localhost:3000"],
     credentials: true,
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ---------------- RATE LIMITERS ----------------
+
+// General API limiter
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 100,
-  message: "Too many requests from this IP, please try again later.",
+  windowMs: 15 * 60 * 1000,
+  max: 200,
 });
 
+// Auth limiter (login / register)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: "Too many authentication attempts, please try again later.",
+  max: 20,
+  message: "Too many authentication attempts. Try later.",
 });
 
+// OTP limiter
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many OTP requests. Please wait.",
+});
+
+// ---------------- ROUTES ----------------
+
 app.use("/api", apiLimiter);
+
+// 🔥 IMPORTANT: OTP routes FIRST
+app.post("/api/auth/send-otp", otpLimiter);
+app.post("/api/auth/verify-otp", otpLimiter);
+
+// Auth routes (login, register)
 app.use("/api/auth", authLimiter, authRoutes);
 
+// Other routes
 app.use("/api/profile", profileRoutes);
 app.use("/api/reminder", reminderRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "OK", message: "Server is running" });
+  res.json({ status: "OK" });
 });
 
+// Cron
 cron.schedule("0 8 * * *", () => {
-  console.log("⏰ Running daily reminder job...");
-  sendEventReminders().catch(err => console.error("Error sending reminders:", err));
+  sendEventReminders().catch(console.error);
 });
 
+// Error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    success: false,
-    message: "Something went wrong!",
-    error: process.env.NODE_ENV === "development" ? err.message : "Internal server error",
-  });
+  console.error(err);
+  res.status(500).json({ success: false, message: "Server error" });
 });
 
-app.use("*", (req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+app.listen(5000, () => {
+  console.log("🚀 Server running on port 5000");
 });

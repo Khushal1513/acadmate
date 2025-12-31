@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import "./Register.css";
 import ApiService from "../services/api";
@@ -6,6 +6,7 @@ import ApiService from "../services/api";
 export default function LoginModal({ isOpen, onClose, onLogin }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
+  
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -15,9 +16,16 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
     section: "",
     email: "",
     phone: "",
+    otp: "",
   });
 
   const [error, setError] = useState({ message: "", field: "" });
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [sendingOTP, setSendingOTP] = useState(false);
+  const [verifyingOTP, setVerifyingOTP] = useState(false);
+  const [submittingForm, setSubmittingForm] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
 
   const branches = [
     "Biotechnology",
@@ -47,6 +55,68 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
       return "Password must contain a special character (e.g., !@#$%).";
     return null;
   };
+
+  // Send OTP
+  const handleSendOTP = async () => {
+    if (!formData.email || !formData.email.trim()) {
+      setError({ message: "Please enter your email first.", field: "email" });
+      return;
+    }
+
+    if (!formData.email.toLowerCase().endsWith("@gmail.com")) {
+      setError({
+        message: "Please provide a valid @gmail.com email address.",
+        field: "email",
+      });
+      return;
+    }
+
+    setSendingOTP(true);
+    setError({ message: "", field: "" });
+
+    try {
+      await ApiService.sendOTP(formData.email);
+      setOtpSent(true);
+      setOtpVerified(false);
+      setResendTimer(60); // 60 seconds countdown
+      setError({
+        message: "✅ OTP sent to your email! Please check your inbox.",
+        field: "",
+      });
+    } catch (err) {
+      setError({ message: err.message || "Failed to send OTP", field: "email" });
+    } finally {
+      setSendingOTP(false);
+    }
+  };
+
+  // Verify OTP
+ const handleVerifyOTP = async () => {
+  if (!formData.otp || formData.otp.length !== 6) return;
+
+  setVerifyingOTP(true);
+  setError({ message: "", field: "" });
+
+  try {
+    await ApiService.verifyOTP(formData.email, formData.otp);
+    setOtpVerified(true);
+    setResendTimer(0);
+    setError({ message: "✅ OTP verified successfully!", field: "" });
+  } catch (err) {
+    setError({ message: err.message || "Invalid OTP", field: "otp" });
+  } finally {
+    setVerifyingOTP(false);
+  }
+};
+
+
+  // Resend timer countdown
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
 
   // Handle Form Submission
   const handleSubmit = async (e) => {
@@ -116,8 +186,36 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           return;
         }
 
+        // Check OTP verification
+        if (!otpVerified) {
+          setError({
+            message: "Please verify your email with OTP before registering.",
+            field: "otp",
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Ensure OTP is present
+        if (!formData.otp || formData.otp.length !== 6) {
+          setError({
+            message: "OTP is required for registration. Please verify your OTP again.",
+            field: "otp",
+          });
+          setLoading(false);
+          return;
+        }
+
         // --- API Call: Register ---
         const { confirmPassword, ...submissionData } = formData;
+        // Explicitly include OTP in registration request (required for backend verification)
+        submissionData.otp = formData.otp;
+        console.log('Registering with data:', { 
+          email: submissionData.email, 
+          hasOTP: !!submissionData.otp, 
+          otpLength: submissionData.otp?.length,
+          otpVerified 
+        });
         await ApiService.register(submissionData);
 
         // Success message + switch to login
@@ -127,6 +225,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
         });
 
         setIsRegistering(false);
+        setOtpSent(false);
+        setOtpVerified(false);
+        setResendTimer(0);
 
         // Reset form
         setFormData({
@@ -138,6 +239,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
           section: "",
           email: "",
           phone: "",
+          otp: "",
         });
 
         // Clear success message automatically
@@ -158,16 +260,22 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
         onClose();
       }
     } catch (err) {
-      if (err.response?.data?.errors) {
+      // Handle validation errors from express-validator
+      if (err.data?.errors && Array.isArray(err.data.errors)) {
         setError({
-          message: err.response.data.errors[0].msg,
-          field: err.response.data.errors[0].param,
+          message: err.data.errors[0].msg,
+          field: err.data.errors[0].param || "",
         });
-      } else if (err.response?.data?.message) {
-        setError({ message: err.response.data.message, field: "" });
+      } else if (err.data?.message) {
+        // Handle error messages from backend
+        setError({ message: err.data.message, field: "" });
+      } else if (err.message) {
+        // Handle other errors
+        setError({ message: err.message, field: "" });
       } else {
-        setError({ message: err.message || "Something went wrong.", field: "" });
+        setError({ message: "Something went wrong. Please try again.", field: "" });
       }
+      console.error('Registration error:', err);
     } finally {
       setLoading(false);
     }
@@ -175,9 +283,32 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
 
   // Handle Input Changes
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    // Only allow numbers for OTP
+    if (name === "otp") {
+      const numericValue = value.replace(/\D/g, "");
+      setFormData({ ...formData, [name]: numericValue });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
     if (error.message) setError({ message: "", field: "" });
   };
+
+  // Reset OTP state when switching modes or closing
+  useEffect(() => {
+    if (!isOpen) {
+      setOtpSent(false);
+      setOtpVerified(false);
+      setResendTimer(0);
+      setFormData((prev) => ({ ...prev, otp: "" }));
+    }
+    if (!isRegistering) {
+      setOtpSent(false);
+      setOtpVerified(false);
+      setResendTimer(0);
+      setFormData((prev) => ({ ...prev, otp: "" }));
+    }
+  }, [isOpen, isRegistering]);
 
   if (!isOpen) return null;
 
@@ -248,21 +379,80 @@ export default function LoginModal({ isOpen, onClose, onLogin }) {
               <label className="block text-sm font-medium custom-brown mb-2">
                 Email
               </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-lg ${
-                  error.field === "email"
-                    ? "border-red-500"
-                    : "border-gray-300"
-                }`}
-              />
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  disabled={otpSent && !otpVerified}
+                  className={`flex-1 px-3 py-2 border rounded-lg ${
+                    error.field === "email"
+                      ? "border-red-500"
+                      : otpVerified
+                      ? "border-green-500"
+                      : "border-gray-300"
+                  } ${otpSent && !otpVerified ? "bg-gray-100" : ""}`}
+                />
+                {isRegistering && !otpVerified && (
+                  <button
+                    type="button"
+                    onClick={handleSendOTP}
+                    disabled={sendingOTP || resendTimer > 0}
+                    className="px-4 py-2 bg-accent text-brown font-semibold rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {sendingOTP
+                      ? "Sending..."
+                      : resendTimer > 0
+                      ? `Resend (${resendTimer}s)`
+                      : "Send OTP"}
+                  </button>
+                )}
+                {isRegistering && otpVerified && (
+                  <div className="px-4 py-2 bg-green-100 text-green-700 font-semibold rounded-lg flex items-center whitespace-nowrap">
+                    ✅ Verified
+                  </div>
+                )}
+              </div>
               {error.field === "email" && (
                 <p className="text-red-500 text-sm mt-1">{error.message}</p>
               )}
             </div>
+
+            {/* OTP Input (only shown when OTP is sent but not verified) */}
+            {isRegistering && otpSent && !otpVerified && (
+              <div>
+                <label className="block text-sm font-medium custom-brown mb-2">
+                  Enter OTP
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="otp"
+                    value={formData.otp}
+                    onChange={handleInputChange}
+                    maxLength={6}
+                    placeholder="Enter 6-digit OTP"
+                    className={`flex-1 px-3 py-2 border rounded-lg ${
+                      error.field === "otp"
+                        ? "border-red-500"
+                        : "border-gray-300"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyOTP}
+                    disabled={loading || !formData.otp || formData.otp.length !== 6}
+                    className="px-4 py-2 bg-accent text-brown font-semibold rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {loading ? "Verifying..." : "Verify OTP"}
+                  </button>
+                </div>
+                {error.field === "otp" && (
+                  <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                )}
+              </div>
+            )}
 
             {/* Password + Confirm Password */}
             <div

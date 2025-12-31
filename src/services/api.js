@@ -18,16 +18,49 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      let data;
+      
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // If response is not JSON, use status text
+        if (!response.ok) {
+          const error = new Error(response.statusText || 'Something went wrong');
+          error.status = response.status;
+          throw error;
+        }
+        return { message: 'Success' };
+      }
       
       if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+        const error = new Error(data.message || data.error || 'Something went wrong');
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
       
       return data;
     } catch (error) {
+      // Re-throw with status if it's a response error
+      if (error.status) {
+        throw error;
+      }
       throw new Error(error.message || 'Network error');
     }
+  }
+
+  static async sendOTP(email) {
+    return this.request('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  static async verifyOTP(email, otp) {
+    return this.request('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
   }
 
   static async register(userData) {
