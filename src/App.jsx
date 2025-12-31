@@ -10,6 +10,7 @@ import SeniorsPage from "./components/SeniorsPage";
 import CalendarPage from "./components/CalendarPage";
 import Task from "./components/TaskMananger/Task";
 import ChatbotHub from "./components/ChatbotHub";
+// Chat page and floating chat button removed per request
 import StudyMaterials from "./components/StudyMaterials";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -206,6 +207,8 @@ function App() {
             <ChatbotHub />
           </ProtectedRoute>
         );
+
+      /* Chat route removed */
 
       case "Study Materials":
         return (
