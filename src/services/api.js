@@ -63,6 +63,27 @@ class ApiService {
     });
   }
 
+  static async sendForgotPasswordOTP(email) {
+    return this.request('/auth/forgot-password/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  static async verifyForgotPasswordOTP(email, otp) {
+    return this.request('/auth/forgot-password/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+  }
+
+  static async resetPassword(data) {
+    return this.request('/auth/forgot-password/reset', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   static async register(userData) {
     return this.request('/auth/register', {
       method: 'POST',

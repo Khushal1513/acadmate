@@ -33,29 +33,18 @@ const apiLimiter = rateLimit({
   max: 200,
 });
 
-// Auth limiter (login / register)
+// Auth limiter (login / register) - OTP rate limiting handled in authRoutes.js
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: "Too many authentication attempts. Try later.",
 });
 
-// OTP limiter
-const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: "Too many OTP requests. Please wait.",
-});
-
 // ---------------- ROUTES ----------------
 
 app.use("/api", apiLimiter);
 
-// 🔥 IMPORTANT: OTP routes FIRST
-app.post("/api/auth/send-otp", otpLimiter);
-app.post("/api/auth/verify-otp", otpLimiter);
-
-// Auth routes (login, register)
+// Auth routes (login, register, OTP) - OTP rate limiting handled in authRoutes.js
 app.use("/api/auth", authLimiter, authRoutes);
 
 // Other routes
