@@ -182,7 +182,9 @@ function App() {
             isAuthenticated={isLoggedIn}
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
-            <Task />
+            <Task 
+            user={userData}     // ✅ THIS is what Option A needs
+        onBack={() => handleSectionChange("Home")}/>
           </ProtectedRoute>
         );
 
