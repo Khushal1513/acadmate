@@ -247,7 +247,23 @@ const Attendance = ({user}) => {
             <input
               type="number"
               value={targetPercentage}
-              onChange={(e) => setTargetPercentage(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+              onChange={(e) => {
+                let value = e.target.value;
+                // Remove leading zeros
+                value = value.replace(/^0+/, '') || '0';
+                const numValue = value === '' ? 0 : Math.min(100, Math.max(0, Number(value)));
+                setTargetPercentage(numValue);
+              }}
+              onInput={(e) => {
+                // Prevent leading zeros during typing
+                e.target.value = e.target.value.replace(/^0+(\d)/, '$1');
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  document.querySelector('.subject-input')?.focus();
+                }
+              }}
               min="0"
               max="100"
               className="target-input"
