@@ -40,6 +40,11 @@ function Task() {
   // Track previous page to determine if we're navigating from home
   const previousPageRef = useRef('home');
   
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentPage]);
+  
   // Update URL when currentPage changes
   useEffect(() => {
     // Don't update URL on initial render
