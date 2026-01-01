@@ -34,8 +34,8 @@
 
 .comment-textarea:focus {
   outline: none;
-  border-color: #4CAF50;
-  box-shadow: 0 0 4px rgba(76, 175, 80, 0.2);
+  border-color: #F4b306;
+  box-shadow: 0 0 4px rgba(244, 179, 6, 0.2);
 }
 
 .comment-actions {
@@ -46,36 +46,21 @@
 
 .btn-comment {
   padding: 8px 16px;
-  background-color: #4CAF50;
+  background-color: #F4b306;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 600;
-  transition: background-color 0.2s;
 }
 
 .btn-comment:hover {
-  background-color: #45a049;
+  background-color: #e0a800;
 }
 
 .btn-comment:disabled {
   background-color: #ccc;
   cursor: not-allowed;
-}
-
-.btn-cancel-comment {
-  padding: 8px 16px;
-  background-color: #e0e0e0;
-  color: #333;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.btn-cancel-comment:hover {
-  background-color: #d0d0d0;
 }
 
 .comments-list {
@@ -85,16 +70,16 @@
 }
 
 .comment-item {
+  position: relative; /* REQUIRED for bottom-right button */
   background-color: #f9f9f9;
-  padding: 15px;
+  padding: 15px 15px 40px; /* space for vote button */
   border-radius: 4px;
-  border-left: 3px solid #4CAF50;
+  border-left: 3px solid #F4b306;
 }
 
 .comment-header {
   display: flex;
   justify-content: space-between;
-  align-items: start;
   margin-bottom: 10px;
 }
 
@@ -112,7 +97,6 @@
   color: #555;
   line-height: 1.5;
   margin-bottom: 10px;
-  word-wrap: break-word;
 }
 
 .comment-footer {
@@ -126,16 +110,14 @@
 .btn-delete-comment {
   background: none;
   border: none;
-  color: #4CAF50;
+  color: #F4b306;
   cursor: pointer;
   font-weight: 600;
-  padding: 0;
-  transition: color 0.2s;
 }
 
 .btn-reply:hover,
 .btn-edit-comment:hover {
-  color: #45a049;
+  color: #e0a800;
 }
 
 .btn-delete-comment {
@@ -146,6 +128,44 @@
   color: #b71c1c;
 }
 
+/* ========================= */
+/* ✅ VOTE BUTTON (NEW) */
+/* ========================= */
+
+.comment-vote {
+  position: absolute;
+  bottom: 10px;
+  right: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff8e1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #F4b306;
+}
+
+.vote-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #F4b306;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.vote-btn:hover {
+  color: #e0a800;
+}
+
+.vote-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ========================= */
+
 .nested-comments {
   margin-left: 20px;
   margin-top: 15px;
@@ -154,7 +174,7 @@
 }
 
 .nested-comments .comment-item {
-  border-left-color: #9CCC65;
+  border-left-color: #FFD54F;
 }
 
 .reply-form {
@@ -162,45 +182,62 @@
   padding: 15px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  margin-top: 10px;
+  margin-top: 12px;
+  width: 100%; /* Make the form full width */
+  box-sizing: border-box; /* include padding in width */
 }
 
 .reply-textarea {
-  width: 100%;
-  padding: 8px 10px;
+  width: 100%; /* fill the container */
+  padding: 10px; /* give enough padding */
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 13px;
-  font-family: inherit;
-  min-height: 80px;
-  resize: vertical;
-  box-sizing: border-box;
+  font-size: 14px;
+  min-height: 100px; /* bigger box */
+  box-sizing: border-box; /* ensures it fits */
+  resize: vertical; /* allow vertical resize */
 }
 
 .reply-textarea:focus {
   outline: none;
-  border-color: #4CAF50;
-  box-shadow: 0 0 4px rgba(76, 175, 80, 0.2);
+  border-color: #F4b306;
+  box-shadow: 0 0 4px rgba(244, 179, 6, 0.2);
+}
+/* Reply form container */
+
+
+/* Button row */
+.reply-actions {
+  display: flex;
+  justify-content: flex-end; /* move to right */
+  gap: 10px;                 /* space between buttons */
+  margin-top: 8px;
 }
 
-.loading-comments {
-  text-align: center;
-  padding: 20px;
-  color: #666;
-  font-size: 14px;
+/* Cancel button */
+.reply-actions .cancel-btn {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.error-comments {
-  background-color: #ffebee;
-  color: #c62828;
-  padding: 15px;
-  border-radius: 4px;
-  margin-bottom: 20px;
+/* Post Reply button */
+.reply-actions .submit-btn {
+  background-color: #fbbf24;
+  color: #000;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.no-comments {
-  text-align: center;
-  padding: 40px 20px;
-  color: #999;
-  font-style: italic;
+/* Disabled state */
+.reply-actions .submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
+
+
+

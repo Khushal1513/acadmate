@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ChatbotHub.css";
 import Lottie from "lottie-react";
+import { MessageCircle, X } from "lucide-react";
 
+<<<<<<< HEAD
 const ChatbotHub = ({ userData }) => {
   // Get user's name from userData
   const getUserName = () => {
@@ -14,6 +16,9 @@ const ChatbotHub = ({ userData }) => {
     ? `Welcome ${userName}`
     : "Welcome to ExamPrep! Get exam-ready answers ✍️";
 
+=======
+const ChatbotHub = ({ isLoggedIn, userData }) => {
+>>>>>>> 268e5ba741f17ba4cb240f183e71348ff699f03f
   const [activeMode, setActiveMode] = useState("examprep");
   const [showWelcome, setShowWelcome] = useState(userName ? true : false);
   const [isWelcomeFading, setIsWelcomeFading] = useState(false);
@@ -29,6 +34,9 @@ const ChatbotHub = ({ userData }) => {
   const prevMessagesLengthRef = useRef(0);
   const isSendingRef = useRef(false);
   const [examPrepAnimData, setExamPrepAnimData] = useState(null);
+  const [showChatWindow, setShowChatWindow] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const chatWindowRef = useRef(null);
 
   // Measure navbar height at runtime and publish as CSS variable so landing can offset itself
   useEffect(() => {
@@ -246,9 +254,44 @@ const ChatbotHub = ({ userData }) => {
   };
 
 
+  // Chat functionality (frontend only)
+  // const sendChatMessage = () => {
+  //   if (!chatInput.trim() || !isLoggedIn) return;
+    
+  //   const newMessage = {
+  //     id: Date.now(),
+  //     sender: userData?.username || userData?.displayName || "You",
+  //     message: chatInput.trim(),
+  //     timestamp: new Date(),
+  //     isOwn: true
+  //   };
+    
+  //   setChatMessages(prev => [...prev, newMessage]);
+  //   setChatInput("");
+    
+  //   // Simulate receiving a message (frontend only - will be replaced with backend later)
+  //   setTimeout(() => {
+  //     const responseMessage = {
+  //       id: Date.now() + 1,
+  //       sender: "User",
+  //       message: "This is a frontend-only chat. Backend will be added later!",
+  //       timestamp: new Date(),
+  //       isOwn: false
+  //     };
+  //     setChatMessages(prev => [...prev, responseMessage]);
+  //   }, 500);
+  // };
+
+  // useEffect(() => {
+  //   if (showChatWindow && chatWindowRef.current) {
+  //     chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+  //   }
+  // }, [chatMessages, showChatWindow]);
+
   return (
     <div className="chatbot-hub">
       <header className="chatbot-header">
+<<<<<<< HEAD
         {activeMode === "examprep" && (
           <div className="examprep-header-left">
             {examPrepAnimData && (
@@ -269,7 +312,71 @@ const ChatbotHub = ({ userData }) => {
             Ask your question
           </p>
         )}
+=======
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', position: 'relative', width: '100%' }}>
+          {activeMode === "examprep" && examPrepAnimData && (
+            <div style={{ width: '100px', height: '100px' }}>
+              <Lottie animationData={examPrepAnimData} loop autoplay style={{ width: '100%', height: '100%' }} />
+            </div>
+          )}
+          <h1>{modeConfig.name}</h1>
+         
+        </div>
+        <p className="chatbot-subtitle">
+          {activeMode === "examprep" ? "Structured answers and strategies for exam success" : "Ask your question"}
+        </p>
+>>>>>>> 268e5ba741f17ba4cb240f183e71348ff699f03f
       </header>
+
+      {/* Chat Window */}
+      {showChatWindow && isLoggedIn && (
+        <div className="chat-window">
+          <div className="chat-window-header">
+            <h3>Community Chat</h3>
+            <button 
+              onClick={() => setShowChatWindow(false)}
+              className="close-chat-btn"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div ref={chatWindowRef} className="chat-messages-container">
+            {chatMessages.length === 0 ? (
+              <div className="chat-empty-state">
+                <p>No messages yet. Start a conversation!</p>
+              </div>
+            ) : (
+              chatMessages.map((msg) => (
+                <div key={msg.id} className={`chat-message ${msg.isOwn ? 'own' : 'other'}`}>
+                  <div className="chat-message-header">
+                    <span className="chat-sender">{msg.sender}</span>
+                    <span className="chat-time">
+                      {new Date(msg.timestamp).toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </span>
+                  </div>
+                  <div className="chat-message-content">{msg.message}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="chat-input-area">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+              placeholder="Type a message..."
+              className="chat-input"
+            />
+            <button onClick={sendChatMessage} className="chat-send-btn">
+              Send
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="chatbox">
         <div className="messages-container">
