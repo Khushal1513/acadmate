@@ -10,7 +10,6 @@ import SeniorsPage from "./components/SeniorsPage";
 import CalendarPage from "./components/CalendarPage";
 import Task from "./components/TaskMananger/Task";
 import ChatbotHub from "./components/ChatbotHub";
-// Chat page and floating chat button removed per request
 import StudyMaterials from "./components/StudyMaterials";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -33,7 +32,10 @@ function App() {
   const [userData, setUserData] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
 
-  /* ================= Restore Login ================= */
+  // 🔑 NEW: auth loading flag
+  const [authLoading, setAuthLoading] = useState(true);
+
+  /* ================= Restore Login (IMPORTANT) ================= */
   useEffect(() => {
     const storedLogin = localStorage.getItem("isLoggedIn");
     const storedUser = localStorage.getItem("user");
@@ -41,71 +43,70 @@ function App() {
 
     if (storedLogin === "true" && storedUser && token) {
       const user = JSON.parse(storedUser);
-      
-      // Normalize on restore too
+
       const normalizedUser = {
         ...user,
         uid: user.id || user._id || user.uid,
         displayName: user.username || user.displayName || user.name,
       };
-      
+
       setIsLoggedIn(true);
       setUserData(normalizedUser);
     }
+
+    setAuthLoading(false); // ✅ allow rendering after restore
   }, []);
 
   /* ================= Handlers ================= */
   const handleLogin = (user) => {
-  // Normalize user data to include uid field for discussion system
     const normalizedUser = {
       ...user,
-      uid: user.id || user._id || user.uid, // Ensure uid exists
+      uid: user.id || user._id || user.uid,
       displayName: user.username || user.displayName || user.name,
     };
-    
+
     setUserData(normalizedUser);
     setIsLoggedIn(true);
 
-    // Update localStorage with normalized data
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    localStorage.setItem("user", JSON.stringify({
-      ...storedUser,
-      ...normalizedUser
-    }));
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
+    localStorage.setItem("isLoggedIn", "true");
+    // token should already be stored by login API
 
     setIsLoginModalOpen(false);
     setShowProfile(false);
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("isLoggedIn");
+
     setIsLoggedIn(false);
     setUserData(null);
     setShowProfile(false);
-    // preserve current route after logout so discussion pages remain visible
   };
 
   const handleShowProfile = () => {
-    // If we're on a discussion route, navigate to home first
-    if (location.pathname.startsWith('/discussions')) {
-      navigate('/');
+    if (location.pathname.startsWith("/discussions")) {
+      navigate("/");
     }
-    
+
     setShowProfile(true);
     setActiveSection("Profile");
+
     try {
       window.history.pushState({ section: "Profile" }, "", "#Profile");
     } catch {}
   };
 
   const handleSectionChange = (section) => {
-    // If we're on a discussion route, navigate to home first
-    if (location.pathname.startsWith('/discussions')) {
-      navigate('/');
+    if (location.pathname.startsWith("/discussions")) {
+      navigate("/");
     }
-    
+
     if (section !== "Profile") setShowProfile(false);
     setActiveSection(section);
+
     try {
       window.history.pushState({ section }, "", `#${section}`);
     } catch {}
@@ -132,20 +133,17 @@ function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, [isLoggedIn]);
 
-  /* Keep legacy `activeSection` in sync with route-based navigation */
+  /* Keep section synced with routes */
   useEffect(() => {
-    try {
-      if (location.pathname.startsWith('/discussions')) {
-        setActiveSection('Discussions');
-      } else if (location.pathname === '/') {
-        // Reset to the hash-based section when returning to home
-        const hash = window.location.hash.replace("#", "") || "Home";
-        setActiveSection(hash);
-      }
-    } catch {}
+    if (location.pathname.startsWith("/discussions")) {
+      setActiveSection("Discussions");
+    } else if (location.pathname === "/") {
+      const hash = window.location.hash.replace("#", "") || "Home";
+      setActiveSection(hash);
+    }
   }, [location.pathname]);
 
-  /* ================= Legacy App Content ================= */
+  /* ================= Legacy Content ================= */
   const renderLegacyContent = () => {
     if (showProfile && userData) {
       return (
@@ -170,7 +168,7 @@ function App() {
 
       case "Seniors":
         return (
-          <ProtectedRoute 
+          <ProtectedRoute
             isAuthenticated={isLoggedIn}
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
@@ -180,7 +178,7 @@ function App() {
 
       case "TaskManager":
         return (
-          <ProtectedRoute 
+          <ProtectedRoute
             isAuthenticated={isLoggedIn}
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
@@ -190,7 +188,7 @@ function App() {
 
       case "EventBuddy":
         return (
-          <ProtectedRoute 
+          <ProtectedRoute
             isAuthenticated={isLoggedIn}
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
@@ -200,19 +198,17 @@ function App() {
 
       case "Chatbot":
         return (
-          <ProtectedRoute 
+          <ProtectedRoute
             isAuthenticated={isLoggedIn}
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
-            <ChatbotHub />
+            <ChatbotHub isLoggedIn={isLoggedIn} userData={userData} />
           </ProtectedRoute>
         );
 
-      /* Chat route removed */
-
       case "Study Materials":
         return (
-          <ProtectedRoute 
+          <ProtectedRoute
             isAuthenticated={isLoggedIn}
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
@@ -224,6 +220,15 @@ function App() {
         return <Home onSectionChange={handleSectionChange} />;
     }
   };
+
+  /* ⛔ Prevent render until auth restored */
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
 
   /* ================= JSX ================= */
   return (
@@ -240,47 +245,35 @@ function App() {
       <div className="pt-16">
         <Routes>
           {/* 🔹 Discussion Routes */}
-          <Route 
-            path="/discussions" 
-            element={
-              <DiscussionList 
-                isLoggedIn={isLoggedIn}
-                userData={userData}
-              />
-            } 
+          <Route
+            path="/discussions"
+            element={<DiscussionList isLoggedIn={isLoggedIn} userData={userData} />}
           />
 
           <Route
             path="/discussions/new"
             element={
               <ProtectedRoute isAuthenticated={isLoggedIn}>
-                <CreateDiscussion 
-                  userData={userData}
-                  isLoggedIn={isLoggedIn}
-                />
+                <CreateDiscussion userData={userData} isLoggedIn={isLoggedIn} />
               </ProtectedRoute>
             }
           />
 
-          <Route 
-            path="/discussions/:id" 
-            element={
-              <DiscussionDetail 
-                isLoggedIn={isLoggedIn}
-                userData={userData}
-              />
-            } 
+          <Route
+            path="/discussions/:id"
+            element={<DiscussionDetail isLoggedIn={isLoggedIn} userData={userData} />}
           />
 
-          {/* 🔹 Main App - MUST BE LAST */}
+          {/* 🔹 Main App */}
           <Route path="/" element={renderLegacyContent()} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
 
-      {activeSection !== "Chatbot" && !location.pathname.startsWith('/discussions') && (
-        <Footer onSectionChange={handleSectionChange} />
-      )}
+      {activeSection !== "Chatbot" &&
+        !location.pathname.startsWith("/discussions") && (
+          <Footer onSectionChange={handleSectionChange} />
+        )}
 
       <LoginModal
         isOpen={isLoginModalOpen}
