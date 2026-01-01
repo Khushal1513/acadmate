@@ -19,7 +19,7 @@ import AttendanceTracker from './Attendance.jsx'
 
 
 
-function Task() {
+function Task({user}) {
   // Initialize state from URL hash or default to 'home'
   const getInitialPage = () => {
     const hash = window.location.hash;
@@ -832,7 +832,12 @@ function Task() {
           {/* Grade Prediction Tool - Calculate grades from CIE marks */}
           {currentPage === 'grades' && <GradePredictor onBack={() => setCurrentPage('home')} />}
           {/* Attendance Tracking Tool - Monitor class attendance */}
-          {currentPage === 'attendance' && <AttendanceTracker onBack={() => setCurrentPage('home')} />}
+{currentPage === 'attendance' && (
+  <AttendanceTracker
+    user={user}
+    onBack={() => setCurrentPage('home')}
+  />
+)}
         </>
       )}
     </>

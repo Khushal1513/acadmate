@@ -3,11 +3,6 @@ import Calendar from './Calender.jsx'
 import './styles.css'
 
 const CalendarPage = ({ onBackToHome }) => {
-  // Scroll to top when component mounts
-  React.useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
   return (
     <>
       <style>
