@@ -10,3 +10,4 @@ yarn-error.log*
 .DS_Store
 config/serviceAccountKey.json
 config/firebase.js
+node_modules/

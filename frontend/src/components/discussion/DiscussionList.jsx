@@ -76,16 +76,22 @@ const DiscussionList = ({ isLoggedIn, userData }) => {
       <div className="discussion-header">
         <h1>Discussions</h1>
         <div className="header-actions">
-          <select 
-            value={sortBy} 
-            onChange={(e) => setSortBy(e.target.value)}
-            className="sort-select"
-          >
-            <option value="createdAt">Latest</option>
-            <option value="voteCount">Most Voted</option>
-          </select>
+          <div className="sort-buttons">
+            <button 
+              className={sortBy === 'voteCount' ? 'sort-btn active' : 'sort-btn'}
+              onClick={() => setSortBy('voteCount')}
+            >
+              Most Votes
+            </button>
+            <button 
+              className={sortBy === 'createdAt' ? 'sort-btn active' : 'sort-btn'}
+              onClick={() => setSortBy('createdAt')}
+            >
+              Newest
+            </button>
+          </div>
           <button onClick={handleCreateNew} className="create-btn">
-            + New Discussion
+            Create
           </button>
         </div>
       </div>
@@ -109,56 +115,69 @@ const DiscussionList = ({ isLoggedIn, userData }) => {
       )}
 
       <div className="discussions-list">
-        {discussions.map((discussion) => (
-          <div key={discussion.id} className="discussion-card">
-            <div className="discussion-votes">
-              <div className="vote-count">{discussion.voteCount || 0}</div>
-              <div className="vote-label">votes</div>
-            </div>
-
-            <div className="discussion-content">
-              <Link to={`/discussions/${discussion.id}`} className="discussion-title">
-                {discussion.title}
-              </Link>
-              
-              <div className="discussion-excerpt">
-                {discussion.content.substring(0, 150)}
-                {discussion.content.length > 150 && '...'}
-              </div>
-              
-              <div className="discussion-meta">
-                <div className="author-info">
+        {discussions.map((discussion, index) => (
+          <React.Fragment key={discussion.id}>
+            <Link to={`/discussions/${discussion.id}`} className="discussion-card-link">
+              <div className="discussion-card">
+                {/* Profile Avatar on Left */}
+                <div className="discussion-author-section">
                   {discussion.author?.photoURL ? (
                     <img 
                       src={discussion.author.photoURL} 
                       alt={discussion.author.displayName}
-                      className="author-avatar"
+                      className="author-avatar-large"
                     />
                   ) : (
-                    <div className="author-avatar-placeholder">
+                    <div className="author-avatar-placeholder-large">
                       {(discussion.author?.displayName || 'A').charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <span className="author-name">
-                    {discussion.author?.displayName || 'Anonymous'}
-                  </span>
                 </div>
-                
-                <span className="discussion-date">{formatDate(discussion.createdAt)}</span>
-                
-                <div className="discussion-stats">
-                  <span className="comment-count">
-                    💬 {discussion.commentCount || 0}
-                  </span>
-                  {discussion.fileUrls && discussion.fileUrls.length > 0 && (
-                    <span className="attachment-count">
-                      📎 {discussion.fileUrls.length}
+
+                {/* Content Section */}
+                <div className="discussion-content">
+                  {/* Name and Time at Top */}
+                  <div className="discussion-header-info">
+                    <span className="author-name">
+                      {discussion.author?.displayName || 'Anonymous'}
                     </span>
-                  )}
+                    <span className="discussion-date">{formatDate(discussion.createdAt)}</span>
+                  </div>
+                  
+                  {/* Title */}
+                  <div className="discussion-title">
+                    {discussion.title}
+                  </div>
+                  
+                  {/* Description */}
+                  <div className="discussion-excerpt">
+                    {discussion.content.substring(0, 200)}
+                    {discussion.content.length > 200 && '...'}
+                  </div>
+                  
+                  {/* Stats at Bottom */}
+                  <div className="discussion-stats">
+                    <span className="stat-item">
+                      ↑ {discussion.voteCount || 0}
+                    </span>
+                    <span className="stat-item">
+                      👁️ {(discussion.viewCount || 0).toLocaleString()}
+                    </span>
+                    <span className="stat-item">
+                      💬 {discussion.commentCount || 0}
+                    </span>
+                    {discussion.fileUrls && discussion.fileUrls.length > 0 && (
+                      <span className="stat-item">
+                        📎 {discussion.fileUrls.length}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </Link>
+            {/* Separator line between discussions */}
+            {index < discussions.length - 1 && <div className="discussion-separator"></div>}
+          </React.Fragment>
         ))}
       </div>
 

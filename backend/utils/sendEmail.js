@@ -31,7 +31,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
       to,
       subject,
       text,
-      html,
+      html: html || `<p>${text}</p>`, // Use HTML if provided, otherwise wrap text
     });
     console.log(`✅ Email sent to ${to}: ${subject}`);
   } catch (error) {
@@ -68,7 +68,7 @@ const sendEventReminders = async () => {
           lastReminderSent: new Date().toISOString(),
         });
       }
-//khoigo8
+
       // 3-hour reminder
       if (hoursDiff <= 24 && hoursDiff > 0) {
         const lastSent = reminder.lastReminderSent ? new Date(reminder.lastReminderSent) : null;

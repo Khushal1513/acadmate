@@ -304,22 +304,27 @@ const CommentSection = ({ discussionId, isLoggedIn, userData, onCommentAdded }) 
         {loading ? 'Comments' : `${comments.length} ${comments.length === 1 ? 'Comment' : 'Comments'}`}
       </h2>
 
-      <div className="add-comment-form">
-        <textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder={isLoggedIn ? "Write your comment..." : "Login to comment"}
-          rows={4}
-          disabled={!isLoggedIn || submitting}
-        />
-        <button
-          onClick={handleAddComment}
-          className="submit-comment-btn"
-          disabled={!isLoggedIn || submitting || !newComment.trim()}
-        >
-          {submitting ? 'Posting...' : 'Post Comment'}
-        </button>
-      </div>
+     <div className="add-comment-form">
+  <div className="comment-input-wrapper">
+    <textarea
+      value={newComment}
+      onChange={(e) => setNewComment(e.target.value)}
+      placeholder={isLoggedIn ? "Write your comment..." : "Login to comment"}
+      rows={4}
+      disabled={!isLoggedIn || submitting}
+      className="comment-textarea"
+    />
+
+    <button
+      onClick={handleAddComment}
+      className="submit-comment-btn inside"
+      disabled={!isLoggedIn || submitting || !newComment.trim()}
+    >
+      {submitting ? 'Posting...' : 'Post comment'}
+    </button>
+  </div>
+</div>
+
 
       {loading ? (
         <div className="loading-comments">Loading comments...</div>

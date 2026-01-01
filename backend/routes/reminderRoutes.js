@@ -1,4 +1,5 @@
-const express = require("express");
+// routes/reminderRoutes.js
+const express = require('express');
 const router = express.Router();
 
 const {
@@ -6,11 +7,22 @@ const {
   addReminder,
   deleteReminder,
   sendReminderEmail,
-} = require("../controllers/reminderController");
+  triggerDailyReminders,
+} = require('../controllers/reminderController');
 
-router.get("/user/:userId", getUserReminders);
-router.post("/add", addReminder);
-router.delete("/:eventId", deleteReminder);
-router.post("/send", sendReminderEmail);
+// Get all reminders for a user
+router.get('/user/:userId', getUserReminders);
+
+// Add a new reminder
+router.post('/add', addReminder);
+
+// Delete a reminder
+router.delete('/:eventId', deleteReminder);
+
+// Send a manual reminder email
+router.post('/send', sendReminderEmail);
+
+// Manually trigger daily reminders (for testing)
+router.post('/trigger-daily', triggerDailyReminders);
 
 module.exports = router;
