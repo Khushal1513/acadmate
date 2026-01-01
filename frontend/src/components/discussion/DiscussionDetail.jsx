@@ -214,21 +214,20 @@ const DiscussionDetail = ({ isLoggedIn, userData }) => {
 
           {/* ACTIONS ROW */}
           <div className="discussion-actions-bottom">
-            {/* Vote Pill */}
-            <div className="vote-pill">
-              <button
-                onClick={handleVote}
-                className={`vote-btn-icon ${hasVoted ? "voted" : ""}`}
-                disabled={voting || !isLoggedIn}
-                title={hasVoted ? "Remove vote" : "Upvote"}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 4L3 15H9V20H15V15H21L12 4Z" fill="currentColor"/>
+            {/* Vote Button */}
+            <button
+              onClick={handleVote}
+              className={`vote-button-modern ${hasVoted ? "voted" : ""}`}
+              disabled={voting || !isLoggedIn}
+              title={hasVoted ? "Remove vote" : "Upvote"}
+            >
+              <div className="vote-icon-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-              </button>
-
-              <span className="vote-count">{discussion.voteCount || 0}</span>
-            </div>
+              </div>
+              <span className="vote-count-modern">{discussion.voteCount || 0}</span>
+            </button>
 
             {/* Delete */}
             {canModify && (
