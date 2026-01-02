@@ -1,9 +1,10 @@
 /**
- * Attendify - Attendance Tracking Component (Complete Redesign)
+ * Attendify - Attendance Tracking Component (Fixed with Debug Logging)
  */
 
 import React, { useState, useEffect } from 'react';
 import './AttendanceTracker.css';
+import { attendanceAPI } from "../../services/api";
 
 const Attendance = ({user}) => {
   const userId = user?.id || user?.uid || user?._id;
@@ -13,33 +14,54 @@ const Attendance = ({user}) => {
   }
 
   const [subjects, setSubjects] = useState([]);
-  const [targetPercentage, setTargetPercentage] = useState(75);
+const [targetPercentage, setTargetPercentage] = useState("75");
   const [newSubjectName, setNewSubjectName] = useState('');
   const [showHistoryFor, setShowHistoryFor] = useState(null);
-  const [historyFilter, setHistoryFilter] = useState('all'); // 'all', 'present', 'absent'
+  const [historyFilter, setHistoryFilter] = useState('all');
   const [markAttendanceFor, setMarkAttendanceFor] = useState(null);
   const [selectedDate, setSelectedDate] = useState('');
-  const [historyLimits, setHistoryLimits] = useState({}); // Track show more limits per subject
+  const [historyLimits, setHistoryLimits] = useState({});
+  const [deleteConfirmFor, setDeleteConfirmFor] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMarkingAttendance, setIsMarkingAttendance] = useState(false);
 
-  
-  // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => {
-  if (!userId) return;
-
+  // Move fetchAttendance outside of useEffect so it can be reused
   const fetchAttendance = async () => {
+    if (isLoading) return; // Prevent duplicate calls
+    
+    setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:5001/api/attendance/${userId}`, {
+      
+      // Fetch all subjects (including empty ones)
+      const summaryRes = await fetch(`http://localhost:5001/api/attendance/${userId}/summary`, {
+        credentials: "include",
+      });
+      
+      if (!summaryRes.ok) {
+        console.error("❌ Summary fetch failed with status:", summaryRes.status);
+        return;
+      }
+      
+      const summary = await summaryRes.json();
+      
+      // Fetch attendance records
+      const recordsRes = await fetch(`http://localhost:5001/api/attendance/${userId}`, {
         credentials: "include",
       });
 
-      if (!res.ok) return;
+      if (!recordsRes.ok) {
+        console.error("❌ Records fetch failed with status:", recordsRes.status);
+        return;
+      }
 
-      const records = await res.json();
+      const records = await recordsRes.json();
 
+      // Group records by subject
       const grouped = {};
       records.forEach(rec => {
         if (!grouped[rec.subject]) grouped[rec.subject] = [];
@@ -50,156 +72,208 @@ const Attendance = ({user}) => {
         });
       });
 
-      const subjectsData = Object.keys(grouped).map(name => ({
-        id: `${name}-${userId}`,
-        name,
-        attendance: grouped[name],
+      // Create subjects array from summary (includes empty subjects)
+      const subjectsData = summary.map(subjectInfo => ({
+        id: `${subjectInfo.subject}-${userId}`,
+        name: subjectInfo.subject,
+        attendance: grouped[subjectInfo.subject] 
+          ? grouped[subjectInfo.subject].sort((a, b) => new Date(b.date) - new Date(a.date))
+          : [],
       }));
+
+      // Sort subjects alphabetically to maintain consistent order
+      subjectsData.sort((a, b) => a.name.localeCompare(b.name));
 
       setSubjects(subjectsData);
     } catch (err) {
-      console.error("Error loading attendance", err);
+      console.error("❌ Error loading attendance:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  fetchAttendance();
-}, [user]);
+  useEffect(() => {
+    if (!userId) return;
+    fetchAttendance();
+  }, [userId]);
 
+  const handleAddSubject = async () => {
+    if (!newSubjectName.trim()) return;
+    
+    const normalized = newSubjectName.trim().toLowerCase();
+    const exists = subjects.some(s => (s.name || '').trim().toLowerCase() === normalized);
+    
+    if (exists) {
+      alert('This subject has already been added.');
+      return;
+    }
 
-  const handleAddSubject = () => {
-    if (newSubjectName.trim()) {
-      const normalized = newSubjectName.trim().toLowerCase();
-      const exists = subjects.some(s => (s.name || '').trim().toLowerCase() === normalized);
-      if (exists) {
-        alert('This subject has already been added.');
-        return;
-      }
-      const newSubject = {
-        id: Date.now().toString(),
-        name: newSubjectName.trim(),
-        attendance: [] // Array of { date, status }
-      };
-      setSubjects([...subjects, newSubject]);
+    try {
+      const res = await fetch(`http://localhost:5001/api/attendance/subject/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: userId,
+          subject: newSubjectName.trim(),
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to add subject");
+
+      // Refresh data from server
+      await fetchAttendance();
       setNewSubjectName('');
+    } catch (err) {
+      console.error("Error adding subject:", err);
+      alert("Could not add subject. Please try again.");
     }
   };
-  const handleDeleteAttendance = async (subjectId, recordId) => {
-  try {
-    await fetch(`http://localhost:5001/api/attendance/record/${recordId}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-
-    setSubjects(prev =>
-      prev.map(s =>
-        s.id === subjectId
-          ? {
-              ...s,
-              attendance: s.attendance.filter(a => a.id !== recordId),
-            }
-          : s
-      )
-    );
-  } catch (err) {
-    console.error("Delete failed", err);
-  }
-};
-
 
   const handleRemoveSubject = async (subjectId) => {
     const subject = subjects.find(s => s.id === subjectId);
-    if (!subject) return;
+    if (!subject) {
+      console.error("❌ Subject not found in state:", subjectId);
+      return;
+    }
 
-    if (!window.confirm('Are you sure you want to remove this subject?')) return;
+    setIsDeleting(true);
 
     try {
-      await fetch(
-        `http://localhost:5001/api/attendance/subject/${userId}/${encodeURIComponent(subject.name)}`,
+      const url = `http://localhost:5001/api/attendance/subject/${userId}/${encodeURIComponent(subject.name)}`;
+      
+      const response = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Delete failed');
+      }
+
+      await fetchAttendance();
+
+      setDeleteConfirmFor(null);
+
+    } catch (err) {
+      console.error("❌ Delete failed:", err);
+      console.error("❌ Error details:", err.message);
+      alert(`Could not delete subject: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleMarkAttendance = async (subjectId, status) => {
+    if (isMarkingAttendance) {
+      return;
+    }
+
+    if (!selectedDate) {
+      alert("Please select a date");
+      return;
+    }
+
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject || !userId) return;
+
+    setIsMarkingAttendance(true);
+
+    try {
+      const res = await fetch(`http://localhost:5001/api/attendance/mark`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: userId,
+          subject: subject.name,
+          date: selectedDate,
+          status,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `Request failed with status ${res.status}`);
+      }
+
+      // Optimistically update UI without refetching from server
+      const newRecord = {
+        id: `${selectedDate}-${status}-${Date.now()}`,
+        date: selectedDate,
+        status
+      };
+
+      setSubjects(prevSubjects => {
+        const updated = prevSubjects.map(s =>
+          s.id === subjectId
+            ? {
+                ...s,
+                attendance: [newRecord, ...s.attendance].sort((a, b) => 
+                  new Date(b.date) - new Date(a.date)
+                )
+              }
+            : s
+        );
+        // Keep alphabetical order
+        return updated.sort((a, b) => a.name.localeCompare(b.name));
+      });
+    } catch (err) {
+      console.error("Error marking attendance:", err);
+      alert(`Error marking attendance: ${err.message}`);
+    } finally {
+      // Add a small delay before allowing next request
+      setTimeout(() => setIsMarkingAttendance(false), 300);
+    }
+  };
+
+  const handleResetAttendance = async (subjectId) => {
+    if (!selectedDate) {
+      alert("Please select a date to reset");
+      return;
+    }
+
+    const subject = subjects.find(s => s.id === subjectId);
+    if (!subject) return;
+
+    const hasRecords = subject.attendance.some(a => a.date === selectedDate);
+    if (!hasRecords) {
+      alert("No records found for this date");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `http://localhost:5001/api/attendance/record/${userId}/${encodeURIComponent(subject.name)}/${selectedDate}`,
         {
           method: "DELETE",
           credentials: "include",
         }
       );
 
-      setSubjects(prev => prev.filter(s => s.id !== subjectId));
-      if (showHistoryFor === subjectId) setShowHistoryFor(null);
-      if (markAttendanceFor === subjectId) setMarkAttendanceFor(null);
+      if (!res.ok) throw new Error("Failed to reset");
+
+      // Optimistically update UI
+      setSubjects(prevSubjects => {
+        const updated = prevSubjects.map(s =>
+          s.id === subjectId
+            ? { ...s, attendance: s.attendance.filter(a => a.date !== selectedDate) }
+            : s
+        );
+        // Keep alphabetical order
+        return updated.sort((a, b) => a.name.localeCompare(b.name));
+      });
     } catch (err) {
-      console.error("Subject delete failed", err);
-      alert("Could not delete subject. Please try again.");
+      console.error("Reset failed", err);
+      alert("Could not reset attendance. Please try again.");
     }
   };
-
- const handleMarkAttendance = async (subjectId, status) => {
-  if (!selectedDate) {
-    alert("Please select a date");
-    return;
-  }
-
-  const subject = subjects.find(s => s.id === subjectId);
-  if (!subject || !userId) return;
-
-  try {
-    const res = await fetch(`http://localhost:5001/api/attendance/mark`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-  userId: userId,
-  subject: subject.name,
-  date: selectedDate,
-  status,
-  attendance: "regular", // ✅ ADD THIS
-}),
-
-    });
-
-    if (!res.ok) throw new Error("Failed");
-
-    const saved = await res.json();
-
-    setSubjects(subjects.map(s =>
-      s.id === subjectId
-        ? {
-            ...s,
-            attendance: [
-              ...s.attendance,
-              { id: saved.id, date: selectedDate, status }
-            ]
-          }
-        : s
-    ));
-  } catch (err) {
-    alert("Error marking attendance");
-  }
-};
-
- const handleResetAttendance = async (subjectId) => {
-  if (!selectedDate) return;
-
-  const subject = subjects.find(s => s.id === subjectId);
-  if (!subject) return;
-
-  const toDelete = subject.attendance.filter(a => a.date === selectedDate);
-
-  await Promise.all(
-    toDelete.map(a =>
-      fetch(`http://localhost:5001/api/attendance/record/${a.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-    )
-  );
-
-  setSubjects(prev =>
-    prev.map(s =>
-      s.id === subjectId
-        ? { ...s, attendance: s.attendance.filter(a => a.date !== selectedDate) }
-        : s
-    )
-  );
-};
-
 
   const calculateStats = (attendance) => {
     const total = attendance.length;
@@ -219,18 +293,6 @@ const Attendance = ({user}) => {
     return attendance;
   };
 
-  const getDateStatus = (subjectId, date) => {
-    const subject = subjects.find(s => s.id === subjectId);
-    if (!subject) return null;
-    const records = subject.attendance.filter(a => a.date === date);
-    if (records.length === 0) return null;
-    
-    const presentCount = records.filter(r => r.status === 'present').length;
-    const absentCount = records.filter(r => r.status === 'absent').length;
-    
-    return { presentCount, absentCount, total: records.length };
-  };
-
   return (
     <div className="attendance-tracker">
       {/* Header Section */}
@@ -248,22 +310,18 @@ const Attendance = ({user}) => {
               type="number"
               value={targetPercentage}
               onChange={(e) => {
-                let value = e.target.value;
-                // Remove leading zeros
-                value = value.replace(/^0+/, '') || '0';
-                const numValue = value === '' ? 0 : Math.min(100, Math.max(0, Number(value)));
-                setTargetPercentage(numValue);
-              }}
-              onInput={(e) => {
-                // Prevent leading zeros during typing
-                e.target.value = e.target.value.replace(/^0+(\d)/, '$1');
-              }}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  document.querySelector('.subject-input')?.focus();
-                }
-              }}
+  const value = e.target.value;
+  if (/^\d*$/.test(value)) {
+    setTargetPercentage(value);
+  }
+}}
+onBlur={() => {
+  let val = parseInt(targetPercentage || "0", 10);
+  if (val > 100) val = 100;
+  if (val < 0) val = 0;
+  setTargetPercentage(String(val));
+}}
+
               min="0"
               max="100"
               className="target-input"
@@ -276,7 +334,7 @@ const Attendance = ({user}) => {
             <div className="subjects-percentages">
               {subjects.map(subject => {
                 const stats = calculateStats(subject.attendance);
-                const isAbove = stats.percentage >= targetPercentage;
+                const isAbove = stats.percentage >= Number(targetPercentage);
                 return (
                   <div key={subject.id} className={`subject-percent-badge ${isAbove ? 'above' : 'below'}`}>
                     <span className="subject-percent-name">{subject.name}:</span>
@@ -332,6 +390,7 @@ const Attendance = ({user}) => {
                     onClick={() => {
                       setMarkAttendanceFor(markAttendanceFor === subject.id ? null : subject.id);
                       setShowHistoryFor(null);
+                      setDeleteConfirmFor(null);
                     }}
                     className="mark-attendance-btn"
                   >
@@ -341,18 +400,52 @@ const Attendance = ({user}) => {
                     onClick={() => {
                       setShowHistoryFor(showHistoryFor === subject.id ? null : subject.id);
                       setMarkAttendanceFor(null);
+                      setDeleteConfirmFor(null);
                     }}
                     className="view-history-btn"
                   >
                     {showHistoryFor === subject.id ? 'Hide History' : 'View History'}
                   </button>
                   <button
-                    onClick={() => handleRemoveSubject(subject.id)}
+                    onClick={() => {
+                      setDeleteConfirmFor(deleteConfirmFor === subject.id ? null : subject.id);
+                      setMarkAttendanceFor(null);
+                      setShowHistoryFor(null);
+                    }}
                     className="remove-subject-btn"
                   >
                     Remove
                   </button>
                 </div>
+
+                {/* Delete Confirmation Section */}
+                {deleteConfirmFor === subject.id && (
+                  <div className="delete-confirmation-section">
+                    <div className="delete-warning">
+                      <div className="warning-icon">⚠️</div>
+                      <div className="warning-text">
+                        <strong>Delete "{subject.name}"?</strong>
+                        <p>This will permanently delete all {stats.total} attendance records for this subject. This action cannot be undone.</p>
+                      </div>
+                    </div>
+                    <div className="delete-actions">
+                      <button
+                        onClick={() => handleRemoveSubject(subject.id)}
+                        disabled={isDeleting}
+                        className="confirm-delete-btn-danger"
+                      >
+                        {isDeleting ? (
+                          <>
+                            <span className="spinner"></span>
+                            Deleting...
+                          </>
+                        ) : (
+                          <>🗑️ Yes, Delete Permanently</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Mark Attendance Section */}
                 {markAttendanceFor === subject.id && (
@@ -369,13 +462,17 @@ const Attendance = ({user}) => {
                       <div className="attendance-buttons-inline">
                         <button
                           onClick={() => handleMarkAttendance(subject.id, 'present')}
+                          disabled={isMarkingAttendance}
                           className="present-btn-small"
+                          style={{ opacity: isMarkingAttendance ? 0.6 : 1 }}
                         >
                           ✓ Present
                         </button>
                         <button
                           onClick={() => handleMarkAttendance(subject.id, 'absent')}
+                          disabled={isMarkingAttendance}
                           className="absent-btn-small"
+                          style={{ opacity: isMarkingAttendance ? 0.6 : 1 }}
                         >
                           ✗ Absent
                         </button>
@@ -468,4 +565,4 @@ const Attendance = ({user}) => {
   );
 }
 
-export default Attendance;
+export default Attendance; 

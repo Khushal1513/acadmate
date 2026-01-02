@@ -1,3 +1,4 @@
+
 // services/api.js
 import axios from "axios";
 import { auth } from "../firebase";
@@ -143,30 +144,42 @@ export const profileAPI = {
    ATTENDANCE API
 ================================ */
 export const attendanceAPI = {
+  // Get all attendance records
   getAttendance: (userId) => {
     if (!userId) throw new Error("userId is required");
     return api.get(`/attendance/${encodeURIComponent(userId)}`);
   },
 
-  getSubjects: (userId) => {
+  // Get subject summary (percentage, total classes)
+  getSummary: (userId) => {
     if (!userId) throw new Error("userId is required");
-    return api.get(
-      `/attendance/subjects/list/${encodeURIComponent(userId)}`
-    );
+    return api.get(`/attendance/${encodeURIComponent(userId)}/summary`);
   },
 
-  syncSubjects: (userId, subjects = []) => {
-    if (!userId) throw new Error("userId is required");
-    if (!Array.isArray(subjects)) {
-      throw new Error("subjects must be an array");
+  // Add a new subject
+  addSubject: (userId, subject) => {
+    if (!userId || !subject) {
+      throw new Error("userId and subject are required");
     }
 
-    return api.post("/attendance/subjects/sync", {
+    return api.post("/attendance/subject/add", {
       userId,
-      subjects,
+      subject,
     });
   },
 
+  // Delete a subject and its records
+  deleteSubject: (userId, subject) => {
+    if (!userId || !subject) {
+      throw new Error("userId and subject are required");
+    }
+
+    return api.delete(
+      `/attendance/subject/${encodeURIComponent(userId)}/${encodeURIComponent(subject)}`
+    );
+  },
+
+  // Mark present / absent
   markAttendance: ({ userId, subject, date, status }) => {
     if (!userId || !subject || !date || !status) {
       throw new Error("Missing attendance fields");
@@ -180,18 +193,20 @@ export const attendanceAPI = {
     });
   },
 
-  deleteAttendanceSession: (userId, subject, date, status) => {
-    if (!userId || !subject || !date || !status) {
-      throw new Error("Missing delete attendance fields");
+  // Reset attendance for a specific date
+  resetAttendance: (userId, subject, date) => {
+    if (!userId || !subject || !date) {
+      throw new Error("Missing reset fields");
     }
 
     return api.delete(
-      `/attendance/${encodeURIComponent(userId)}/${encodeURIComponent(
+      `/attendance/record/${encodeURIComponent(userId)}/${encodeURIComponent(
         subject
-      )}/${encodeURIComponent(date)}/${encodeURIComponent(status)}`
+      )}/${encodeURIComponent(date)}`
     );
   },
 };
+
 
 
 /* ================================
