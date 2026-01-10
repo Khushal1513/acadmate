@@ -6,11 +6,11 @@ import { auth } from "../firebase";
 /* ================================
    Base URL
 ================================ */
-const API_BASE_URL =
-  process.env.NODE_ENV === "production"
-    ? process.env.REACT_APP_API_URL || "https://your-backend-domain.com/api"
-    : "http://localhost:5001/api";
-
+const API_BASE_URL = 
+  import.meta.env.VITE_API_URL || 
+  (import.meta.env.MODE === "production"
+    ? "https://acadmate-7z8f.onrender.com/api" 
+    : "http://localhost:5001/api");
 /* ================================
    Axios Instance
 ================================ */
