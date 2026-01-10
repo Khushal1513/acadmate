@@ -25,7 +25,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:3000",
-      "https://acadmate-lac.vercel.app/",
+      "https://acadmate-lac.vercel.app",
       process.env.CLIENT_URL,
     ],
     credentials: true,
