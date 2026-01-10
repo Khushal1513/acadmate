@@ -95,7 +95,7 @@ const ChatbotHub = ({ userData }) => {
 
     console.log("Sending payload:", payload);
 
-    fetch("https://wan-unfugal-semirhythmically.ngrok-free.dev/query", {
+    fetch("https://wan-unfugal-semirhythmically.ngrok-free.dev/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
