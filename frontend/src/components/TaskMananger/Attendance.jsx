@@ -109,7 +109,7 @@ const [targetPercentage, setTargetPercentage] = useState("75");
     }
 
     try {
-      const res = await fetch(`hhttps://acadmate-7z8f.onrender.com/api/attendance/subject/add`, {
+      const res = await fetch(`https://acadmate-7z8f.onrender.com/api/attendance/subject/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
