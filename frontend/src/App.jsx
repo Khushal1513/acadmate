@@ -11,6 +11,7 @@ import CalendarPage from "./components/CalendarPage";
 import Task from "./components/TaskMananger/Task";
 import ChatbotHub from "./components/ChatbotHub";
 import StudyMaterials from "./components/StudyMaterials";
+import Attendance from "./components/TaskMananger/Attendance";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 /* ===== Discussion Pages ===== */
@@ -183,8 +184,9 @@ function App() {
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
             <Task 
-            user={userData}     // ✅ THIS is what Option A needs
-        onBack={() => handleSectionChange("Home")}/>
+              user={userData}
+              onBack={() => handleSectionChange("Home")}
+            />
           </ProtectedRoute>
         );
 
@@ -215,6 +217,16 @@ function App() {
             onLoginRequired={() => setIsLoginModalOpen(true)}
           >
             <StudyMaterials user={userData} />
+          </ProtectedRoute>
+        );
+
+      case "Attendify":
+        return (
+          <ProtectedRoute 
+            isAuthenticated={isLoggedIn}
+            onLoginRequired={() => setIsLoginModalOpen(true)}
+          >
+            <Attendance user={userData} />
           </ProtectedRoute>
         );
 

@@ -15,12 +15,11 @@ Usage:
 import uvicorn
 from config import config
 
-
 if __name__ == "__main__":
     uvicorn.run(
         "api:app",
         host=config.API_HOST,
         port=config.API_PORT,
         reload=False,  # Set to True for development
-        log_level=config.LOG_LEVEL.lower()
+        log_level=config.LOG_LEVEL.lower()    
     )

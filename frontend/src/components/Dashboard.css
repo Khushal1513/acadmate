@@ -16,8 +16,6 @@
   font-size: 2.5rem;
   color: var(--brown);
   font-weight: 700;
-  margin-bottom: 1rem;
-  text-align: center;
 }
 
 .dashboard-header p {
@@ -35,16 +33,10 @@
 }
 
 .cycle-card {
-  background: white;
+  background: #fff;
   border-radius: 20px;
   padding: 2.5rem;
-  box-shadow: 0 10px 30px rgba(26, 18, 0, 0.1);
-  border: 2px solid #ddd9c5;
-  transition: transform 0.3s ease;
-}
-
-.cycle-card:hover {
-  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .cycle-header {
@@ -54,54 +46,53 @@
 
 .cycle-icon {
   font-size: 4rem;
-  margin-bottom: 1rem;
 }
 
 .cycle-header h3 {
   font-size: 2rem;
   color: var(--accent);
-  margin-bottom: 0.5rem;
 }
 
-.cycle-header p {
-  color: var(--brown);
-  opacity: 0.7;
-  font-size: 1.1rem;
-}
+/* ---------------- SUBJECTS (FINAL MERGED FIX) ---------------- */
 
 .subjects-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
   margin-bottom: 2rem;
 }
 
-.subjects-list h4 {
+.subjects-label {
+  font-weight: 600;
   color: var(--brown);
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
+  white-space: nowrap;
+  padding-top: 0.35rem;
 }
 
 .subjects-tags {
   display: flex;
-  flex-wrap: wrap;      /* allows tags to go to next line when needed */
-  gap: 0.5rem;          /* spacing between tags */
-  justify-content: flex-start; /* align tags to left */
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: flex-start;
 }
 
 .subject-tag {
+  display: inline-flex;
+  align-items: center;
   background-color: var(--beige);
   color: var(--brown);
-  padding: 0.4rem 0.8rem;
+  padding: 0.4rem 0.9rem;
   border-radius: 12px;
   font-size: 0.9rem;
   border: 1px solid var(--beige-footer);
-
-  display: inline-flex;   /* shrink width to content */
-  align-items: center;    /* vertical align text */
-  flex-shrink: 0;         /* prevents tag from shrinking too much */
-  white-space: normal;    /* allows text to wrap inside tag if too long */
-  max-width: 100%;        /* ensures tag doesn't overflow container */
+  flex-shrink: 0;
+  white-space: normal;
+  max-width: 100%;
 }
 
-
+/* ---------------- MATERIALS ---------------- */
 
 .materials-grid {
   display: grid;
@@ -113,103 +104,29 @@
   background: linear-gradient(135deg, var(--beige), var(--beige-footer));
   border-radius: 12px;
   padding: 1.5rem;
-  text-decoration: none;
-  color: var(--brown);
-  transition: all 0.3s ease;
-  border: 2px solid transparent;
-  text-align: center;
+  border: none;
   cursor: pointer;
-  width: 100%;
-  font-family: inherit;
-  display: block;
+  transition: 0.3s ease;
 }
 
 .material-card:hover {
   transform: translateY(-3px);
-  border-color: var(--accent);
-  box-shadow: 0 5px 20px rgba(244, 179, 12, 0.2);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
 }
 
 .material-icon {
   font-size: 2.5rem;
-  margin-bottom: 0.8rem;
 }
 
 .material-card h5 {
+  margin-top: 0.5rem;
   font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-  color: var(--brown);
-  font-weight: 600;
 }
 
-.material-card p {
-  font-size: 0.9rem;
-  opacity: 0.7;
-  line-height: 1.4;
-}
+/* ---------------- MOBILE ---------------- */
 
-/* Mobile Responsiveness */
 @media (max-width: 768px) {
-  .dashboard-main {
-    padding: 2rem 0;
-  }
-  
-  .dashboard-header h2 {
-    font-size: 2rem;
-  }
-  
-  .dashboard-header p {
-    font-size: 1rem;
-  }
-  
-  .cycle-card {
-    padding: 2rem;
-  }
-  
-  .cycle-header h3 {
-    font-size: 1.8rem;
-  }
-  
-  .cycle-icon {
-    font-size: 3rem;
-  }
-  
   .materials-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-  
-  .subjects-tags {
-    justify-content: center;
-  }
-}
-
-@media (max-width: 480px) {
-  .cycle-card {
-    padding: 1.5rem;
-  }
-  
-  .cycle-header h3 {
-    font-size: 1.5rem;
-  }
-  
-  .cycle-icon {
-    font-size: 2.5rem;
-  }
-  
-  .material-card {
-    padding: 1.2rem;
-  }
-  
-  .material-icon {
-    font-size: 2rem;
-  }
-  
-  .material-card h5 {
-    font-size: 1rem;
-  }
-  
-  .material-card p {
-    font-size: 0.8rem;
   }
 }

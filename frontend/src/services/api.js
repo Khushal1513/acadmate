@@ -1,4 +1,3 @@
-
 // services/api.js
 import axios from "axios";
 import { auth } from "../firebase";
