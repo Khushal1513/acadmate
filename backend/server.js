@@ -1,14 +1,13 @@
 // server.js
 require("dotenv").config();
+const { db, admin } = require("./config/firebase"); // This imports EVERYTHING you need
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const cron = require("node-cron");
-const admin = require("firebase-admin");
+// const admin = require("firebase-admin"); <--- REMOVE OR COMMENT OUT THIS LINE
 const multer = require("multer");
-// Add this at line 1 of server.js
-const { db, admin } = require("./config/firebase");
 /* ================================
    EXPRESS APP
 ================================ */
