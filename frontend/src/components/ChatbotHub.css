@@ -1246,3 +1246,87 @@
     left: 10px;
   }
 }
+/* ============================= */
+/* DOCUMENT-STYLE BOT RESPONSE */
+/* ============================= */
+
+/* Remove chat bubble appearance for bot */
+.message.bot {
+  align-self: stretch !important;
+  max-width: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 1.5rem 0 !important;
+}
+
+/* Document-style container */
+.message.bot .bot-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.2rem 2rem;
+  background: transparent;
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: var(--brown);
+}
+
+/* Paragraph spacing */
+.message.bot .bot-content p {
+  margin: 1.2rem 0;
+}
+
+/* Horizontal separator between sections */
+.message.bot .bot-content hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+  margin: 1.8rem 0;
+}
+
+/* Headings look like notes */
+.message.bot .bot-content h1,
+.message.bot .bot-content h2,
+.message.bot .bot-content h3 {
+  margin-top: 2rem;
+  margin-bottom: 0.6rem;
+  color: var(--accent);
+  border-bottom: 2px solid rgba(244, 179, 12, 0.4);
+  padding-bottom: 0.3rem;
+}
+
+/* Lists */
+.message.bot .bot-content ul,
+.message.bot .bot-content ol {
+  margin: 1rem 0 1.2rem 1.5rem;
+}
+
+/* Code blocks */
+.message.bot .bot-content pre {
+  background: #f4f4f4;
+  border-left: 4px solid var(--accent);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+/* Inline code */
+.message.bot .bot-content code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .message.bot .bot-content {
+    padding: 1rem 1.2rem;
+    font-size: 0.98rem;
+  }
+}
+
+.bot-content hr {
+  border: none;
+  border-top: 1.5px solid #ccc;
+  margin: 12px 0;
+}

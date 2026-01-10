@@ -12,6 +12,7 @@
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --max-warnings=0",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\"",
     "typecheck": "tsc --noEmit"
+    
   },
   "author": "",
   "license": "MIT",

@@ -1,41 +1,18 @@
 // server.js
 require("dotenv").config();
+const { db, admin } = require("./config/firebase"); // This imports EVERYTHING you need
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const cron = require("node-cron");
-const admin = require("firebase-admin");
+// const admin = require("firebase-admin"); <--- REMOVE OR COMMENT OUT THIS LINE
 const multer = require("multer");
-
 /* ================================
    EXPRESS APP
 ================================ */
 const app = express();
 
-/* ================================
-   FIREBASE ADMIN INITIALIZATION
-   (Initialize ONCE)
-================================ */
-try {
-  const serviceAccount = require("./config/serviceAccountKey.json");
-
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    storageBucket:
-      process.env.FIREBASE_STORAGE_BUCKET ||
-      process.env.FIREBASE_BUCKET ||
-      "your-project-id.appspot.com",
-  });
-
-  console.log("✅ Firebase Admin initialized");
-
-  const bucket = admin.storage().bucket();
-  console.log("📦 Firebase Storage bucket:", bucket.name);
-} catch (error) {
-  console.error("❌ Firebase initialization failed:", error.message);
-  process.exit(1);
-}
 
 /* ================================
    SECURITY & MIDDLEWARE
@@ -48,6 +25,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:3000",
+      "https://acadmate-lac.vercel.app",
       process.env.CLIENT_URL,
     ],
     credentials: true,
