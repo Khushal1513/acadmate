@@ -227,6 +227,7 @@ const ChatbotHub = ({ userData }) => {
     escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
     escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
     escaped = escaped.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+     escaped = escaped.replace(/\n/g, "<br>");
     escaped = escaped.replace(/\n/g, "<br>");
 
     return escaped;

@@ -81,18 +81,27 @@
 
 .subjects-tags {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-wrap: wrap;      /* allows tags to go to next line when needed */
+  gap: 0.5rem;          /* spacing between tags */
+  justify-content: flex-start; /* align tags to left */
 }
 
 .subject-tag {
   background-color: var(--beige);
   color: var(--brown);
-  padding: 0.3rem 0.8rem;
-  border-radius: 20px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
   font-size: 0.9rem;
   border: 1px solid var(--beige-footer);
+
+  display: inline-flex;   /* shrink width to content */
+  align-items: center;    /* vertical align text */
+  flex-shrink: 0;         /* prevents tag from shrinking too much */
+  white-space: normal;    /* allows text to wrap inside tag if too long */
+  max-width: 100%;        /* ensures tag doesn't overflow container */
 }
+
+
 
 .materials-grid {
   display: grid;
