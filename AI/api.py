@@ -66,7 +66,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://acadmate-7z8f.onrender.com",
+        "https://acadmate-lac.vercel.app",
         "http://localhost:5173"
     ],
     allow_credentials=True,
