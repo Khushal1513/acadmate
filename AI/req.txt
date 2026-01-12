@@ -1,7 +1,7 @@
 
 sentence-transformers
 huggingface-hub
-pinecone-client
+pinecone
 fastapi
 uvicorn[standard]
 pydantic
