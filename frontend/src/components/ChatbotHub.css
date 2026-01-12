@@ -1369,3 +1369,132 @@
     margin: 0.6rem 0 0.8rem 1.2rem !important;
   }
 }
+
+/* ============================= */
+/* CLEAR HEADING vs TEXT FIX */
+/* ============================= */
+
+@media (max-width: 768px) {
+
+  /* Main headings */
+  .message.bot .bot-content h1 {
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    color: var(--accent) !important;
+    margin: 1.6rem 0 0.6rem 0 !important;
+    border-bottom: 2px solid rgba(244, 179, 12, 0.45);
+    padding-bottom: 0.35rem;
+  }
+
+  .message.bot .bot-content h2 {
+    font-size: 1.18rem !important;
+    font-weight: 700 !important;
+    color: var(--accent) !important;
+    margin: 1.3rem 0 0.5rem 0 !important;
+  }
+
+  .message.bot .bot-content h3 {
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    color: var(--accent) !important;
+    margin: 1.1rem 0 0.4rem 0 !important;
+  }
+
+  /* Normal paragraph text */
+  .message.bot .bot-content p {
+    font-size: 0.96rem !important;
+    color: rgba(26, 18, 0, 0.85) !important;
+    margin: 0.75rem 0 !important;
+    line-height: 1.65 !important;
+  }
+
+  /* Lists */
+  .message.bot .bot-content li {
+    font-size: 0.95rem !important;
+    margin-bottom: 0.45rem;
+    color: rgba(26, 18, 0, 0.85);
+  }
+
+  /* Section separation */
+  .message.bot .bot-content hr {
+    margin: 1.4rem 0;
+    border-top: 1.5px solid rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* ===================================== */
+/* FIX: TEXT → VISUAL HEADINGS (REAL FIX) */
+/* ===================================== */
+
+/* Chat reply container */
+.message.bot .bot-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem;
+  line-height: 1.75;
+  color: #2b1d00;
+}
+
+/* Normal paragraph text */
+.message.bot .bot-content p {
+  font-size: 1rem;
+  margin: 0.8rem 0;
+  color: #3a2a00;
+}
+
+/* ===== FAKE HEADINGS FROM KEYWORDS ===== */
+
+/* Definition / Explanation / Examples lines */
+.message.bot .bot-content p strong,
+.message.bot .bot-content p b {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--accent);
+  margin: 1.8rem 0 0.6rem 0;
+  padding-left: 0.8rem;
+  border-left: 5px solid var(--accent);
+}
+
+/* Handle cases like "Definition:" not wrapped in <strong> */
+.message.bot .bot-content p::before {
+  content: "";
+}
+
+/* Lists */
+.message.bot .bot-content ol,
+.message.bot .bot-content ul {
+  margin: 0.8rem 0 1.2rem 1.5rem;
+}
+
+.message.bot .bot-content li {
+  font-size: 0.98rem;
+  margin-bottom: 0.5rem;
+  color: #3a2a00;
+}
+
+/* Examples numbering clarity */
+.message.bot .bot-content li::marker {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 768px) {
+
+  .message.bot .bot-content {
+    padding: 1.2rem 1.4rem;
+  }
+
+  .message.bot .bot-content p {
+    font-size: 0.95rem;
+  }
+
+  .message.bot .bot-content p strong,
+  .message.bot .bot-content p b {
+    font-size: 1.15rem;
+    margin-top: 1.4rem;
+  }
+}
+

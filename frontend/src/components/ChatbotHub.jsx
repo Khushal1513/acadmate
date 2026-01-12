@@ -220,18 +220,132 @@ const ChatbotHub = ({ userData }) => {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-  const renderMarkdown = (text) => {
-    if (!text) return "";
+const renderMarkdown = (text) => {
+  if (!text) return "";
 
-    let escaped = escapeHtml(text);
-    escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
-    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    escaped = escaped.replace(/\*([^*]+)\*/g, "<em>$1</em>");
-     escaped = escaped.replace(/\n/g, "<br>");
-    escaped = escaped.replace(/\n/g, "<br>");
+  // Escape HTML first
+  let processed = escapeHtml(text);
 
-    return escaped;
-  };
+  // ===== CODE BLOCKS - Must do BEFORE other processing =====
+  const codeBlocks = [];
+  processed = processed.replace(/```([\s\S]*?)```/g, (match, code) => {
+    const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
+    codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    return placeholder;
+  });
+
+  // ===== INLINE CODE =====
+  processed = processed.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  // ===== BOLD & ITALIC =====
+  processed = processed.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  processed = processed.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+  // ===== PROCESS LINE BY LINE =====
+  const lines = processed.split("\n");
+  let html = "";
+  let inOrderedList = false;
+  let inUnorderedList = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    
+    // Empty line - close any open lists
+    if (!line) {
+      if (inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
+      if (inUnorderedList) {
+        html += "</ul>";
+        inUnorderedList = false;
+      }
+      html += "<br>";
+      continue;
+    }
+
+    // Code block placeholder - restore it
+    if (line.includes("___CODE_BLOCK_")) {
+      if (inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
+      if (inUnorderedList) {
+        html += "</ul>";
+        inUnorderedList = false;
+      }
+      const idx = parseInt(line.match(/___CODE_BLOCK_(\d+)___/)[1]);
+      html += codeBlocks[idx];
+      continue;
+    }
+
+    // HEADINGS - Keywords at start of line
+    const headingMatch = line.match(/^(Definition|Explanation|Examples?|Key Points?|Notes?|Summary|Code Example|Introduction|Conclusion|Important|Features?|Types?|Properties|Advantages?|Disadvantages?|Benefits?|Uses?|Applications?|Usage):?\s*$/i);
+    if (headingMatch) {
+      if (inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
+      if (inUnorderedList) {
+        html += "</ul>";
+        inUnorderedList = false;
+      }
+      html += `<h2>${headingMatch[1]}</h2>`;
+      continue;
+    }
+
+    // NUMBERED LIST - "1. Item" or "1) Item"
+    const numberedMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
+    if (numberedMatch) {
+      if (inUnorderedList) {
+        html += "</ul>";
+        inUnorderedList = false;
+      }
+      if (!inOrderedList) {
+        html += "<ol>";
+        inOrderedList = true;
+      }
+      html += `<li>${numberedMatch[2]}</li>`;
+      continue;
+    }
+
+    // BULLET LIST - "* Item" or "- Item"
+    const bulletMatch = line.match(/^[*\-]\s+(.+)$/);
+    if (bulletMatch) {
+      if (inOrderedList) {
+        html += "</ol>";
+        inOrderedList = false;
+      }
+      if (!inUnorderedList) {
+        html += "<ul>";
+        inUnorderedList = true;
+      }
+      html += `<li>${bulletMatch[1]}</li>`;
+      continue;
+    }
+
+    // REGULAR PARAGRAPH
+    if (inOrderedList) {
+      html += "</ol>";
+      inOrderedList = false;
+    }
+    if (inUnorderedList) {
+      html += "</ul>";
+      inUnorderedList = false;
+    }
+    html += `<p>${line}</p>`;
+  }
+
+  // Close any remaining open lists
+  if (inOrderedList) html += "</ol>";
+  if (inUnorderedList) html += "</ul>";
+
+  return html;
+};
+
+
+
+
 
   return (
     <div className="chatbot-hub">
