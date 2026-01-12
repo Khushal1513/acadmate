@@ -1330,3 +1330,42 @@
   border-top: 1.5px solid #ccc;
   margin: 12px 0;
 }
+
+/* Make bot messages more readable on small screens */
+@media (max-width: 640px) {
+  .message { max-width: 92% !important; padding: 0.9rem 1rem; }
+  .chatbox .messages-container { padding: 1rem; }
+  
+  /* Ensure bot content formatting is preserved on mobile */
+  .message.bot .bot-content h1 { 
+    font-size: 1.2rem !important; 
+    font-weight: 700 !important;
+    color: var(--accent) !important;
+  }
+  .message.bot .bot-content h2 { 
+    font-size: 1.1rem !important; 
+    font-weight: 700 !important;
+    color: var(--accent) !important;
+  }
+  .message.bot .bot-content h3 { 
+    font-size: 1rem !important; 
+    font-weight: 700 !important;
+    color: var(--accent) !important;
+  }
+  
+  .message.bot h1 { font-size: 1.2rem !important; font-weight: 700 !important; }
+  .message.bot h2 { font-size: 1.1rem !important; font-weight: 700 !important; }
+  .message.bot h3 { font-size: 1rem !important; font-weight: 700 !important; }
+  .message.bot pre, .message.bot .code-block { font-size: 0.9rem; }
+  
+  /* Ensure lists and paragraphs display correctly */
+  .message.bot .bot-content p {
+    margin: 0.8rem 0 !important;
+    line-height: 1.6 !important;
+  }
+  
+  .message.bot .bot-content ul,
+  .message.bot .bot-content ol {
+    margin: 0.6rem 0 0.8rem 1.2rem !important;
+  }
+}
