@@ -1,8 +1,17 @@
-/* Study Materials Navigation Styles */
+/* ========================= */
+/* Study Materials Container */
+/* ========================= */
+
 .study-materials-container {
   min-height: 100vh;
   background-color: var(--beige);
+  padding-top: 100px; /* space for fixed navbar */
+  box-sizing: border-box;
 }
+
+/* ========================= */
+/* Fixed Back Button         */
+/* ========================= */
 
 .simple-nav {
   position: fixed;
@@ -15,37 +24,48 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: white;
+  background: #fff;
   border: 2px solid var(--accent);
   color: var(--accent);
   font-size: 1.5rem;
-  font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(244, 179, 12, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: 0.3s ease;
+  box-shadow: 0 4px 12px rgba(244, 179, 12, 0.3);
 }
 
 .back-arrow-btn:hover {
   background: var(--accent);
-  color: white;
+  color: #fff;
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(244, 179, 12, 0.4);
 }
+
+/* ========================= */
+/* Content Wrapper           */
+/* ========================= */
 
 .study-materials-content {
-  padding: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
-/* Responsive Design */
+/* ========================= */
+/* Mobile Adjustments        */
+/* ========================= */
+
 @media (max-width: 768px) {
+  .study-materials-container {
+    padding-top: 80px;
+  }
+
   .simple-nav {
     top: 70px;
     left: 15px;
   }
-  
+
   .back-arrow-btn {
     width: 45px;
     height: 45px;
@@ -58,11 +78,14 @@
     top: 60px;
     left: 10px;
   }
-  
+
   .back-arrow-btn {
     width: 40px;
     height: 40px;
     font-size: 1.2rem;
   }
-}
 
+  .study-materials-content {
+    padding: 0 12px;
+  }
+}
