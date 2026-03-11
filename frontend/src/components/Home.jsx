@@ -101,30 +101,17 @@ export default function Home({ onSectionChange, isLoggedIn, onLoginRequired }) {
   return (
     <div className="min-h-screen custom-beige relative">
 
-     {/* ===== FLOATING ATTENDIFY BUTTON ===== */}
-<div className="fixed top-[140px] right-2 sm:top-32 sm:right-6 md:top-28 md:right-16 z-40">
-  <button
-    onClick={() => handleCardClick({ action: 'Attendify', protected: true })}
-    aria-label="Open Attendify"
-    className="group bg-transparent p-0 border-none outline-none cursor-pointer transition-transform hover:scale-105"
-  >
-    {/* Mobile */}
-    <div className="block sm:hidden">
-      <AttendanceIcon size={50} />
-    </div>
+      {/* ===== FLOATING ATTENDANCE BUTTON ===== */}
+     <div className="fixed right-4 bottom-48 md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:right-8 z-40">
 
-    {/* Tablet */}
-    <div className="hidden sm:block md:hidden">
-      <AttendanceIcon size={68} />
-    </div>
-
-    {/* Desktop */}
-    <div className="hidden md:block">
-      <AttendanceIcon size={88} />
-    </div>
-  </button>
-</div>
-
+        <button
+          onClick={() => handleCardClick({ action: 'Attendify', protected: true })}
+          aria-label="Open Attendance"
+          className="flex items-center justify-center transition-all duration-300 hover:scale-110 focus:outline-none rounded-full"
+        >
+          <AttendanceIcon size={110} />
+        </button>
+      </div>
 
       {/* ===== HERO SECTION ===== */}
       <section className="py-20 px-4">

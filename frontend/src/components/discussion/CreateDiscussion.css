@@ -465,7 +465,7 @@
 }
 
 .submit-btn {
-  background-color: #3b82f6;
+  background-color: #E0A800; /* golden yellow */
   color: white;
   display: flex;
   align-items: center;
@@ -473,13 +473,24 @@
 }
 
 .submit-btn:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: #C99500; /* slightly darker */
+}
+
+.submit-btn:active:not(:disabled) {
+  background-color: #B8860B;
+}
+
+.submit-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(224, 168, 0, 0.35);
 }
 
 .submit-btn:disabled {
-  background-color: #9ca3af;
+  background-color: #E6C766;
   cursor: not-allowed;
 }
+
+
 
 .spinner-small {
   display: inline-block;
