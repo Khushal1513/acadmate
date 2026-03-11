@@ -76,7 +76,7 @@ const CreateDiscussion = ({ userData, isLoggedIn }) => {
         console.log(`📤 Uploading ${i + 1}/${files.length}:`, files[i].name);
         
         // Upload to your backend
-        const response = await fetch(`${API_URL}/upload`, {
+        const response = await fetch(`${API_URL}/api/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
