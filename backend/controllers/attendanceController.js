@@ -10,7 +10,7 @@ class AttendanceController {
    * Add a new subject
    * POST /api/attendance/subject/add
    */
-  async addSubject(req, res) {
+async addSubject(req, res) {
     try {
       const { userId, subject } = req.body;
 
@@ -20,10 +20,11 @@ class AttendanceController {
 
       const result = await attendanceService.addSubject(userId, subject);
 
-      res.json({ 
+      res.json({
         message: "Subject added successfully",
         ...result
       });
+
     } catch (err) {
       console.error("❌ Add subject error:", err);
       res.status(500).json({ error: err.message });
@@ -42,17 +43,24 @@ class AttendanceController {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      const result = await attendanceService.markAttendance(userId, subject, date, status);
+      const result = await attendanceService.markAttendance(
+        userId,
+        subject,
+        date,
+        status
+      );
 
-      res.json({ 
+      res.json({
         message: "Attendance marked successfully",
         ...result
       });
+
     } catch (err) {
       console.error("❌ Mark attendance error:", err);
       res.status(500).json({ error: err.message });
     }
   }
+
 
   /**
    * Reset attendance for a specific date
@@ -61,15 +69,18 @@ class AttendanceController {
   async resetAttendanceForDate(req, res) {
     try {
       const { userId, subject, date } = req.params;
-      const decodedSubject = decodeURIComponent(subject);
 
-      await attendanceService.resetAttendanceForDate(userId, decodedSubject, date);
+      await attendanceService.resetAttendanceForDate(
+        userId,
+        decodeURIComponent(subject),
+        date
+      );
 
       res.json({ message: "Date record deleted" });
+
     } catch (err) {
       console.error("❌ Delete record error:", err);
-      const statusCode = err.message === "User document not found" ? 404 : 500;
-      res.status(statusCode).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   }
 
@@ -80,22 +91,20 @@ class AttendanceController {
   async deleteSubject(req, res) {
     try {
       const { userId, subject } = req.params;
-      const decodedSubject = decodeURIComponent(subject);
 
-      if (!userId || !subject) {
-        return res.status(400).json({ error: "Missing userId or subject" });
-      }
+      const result = await attendanceService.deleteSubject(
+        userId,
+        decodeURIComponent(subject)
+      );
 
-      const result = await attendanceService.deleteSubject(userId, decodedSubject);
-
-      res.json({ 
+      res.json({
         message: "Subject deleted successfully",
         ...result
       });
+
     } catch (err) {
       console.error("❌ Delete subject error:", err);
-      const statusCode = err.message.includes("not found") ? 404 : 500;
-      res.status(statusCode).json({ error: err.message });
+      res.status(500).json({ error: err.message });
     }
   }
 
@@ -110,6 +119,7 @@ class AttendanceController {
       const records = await attendanceService.getAllRecords(userId);
 
       res.json(records);
+
     } catch (err) {
       console.error("❌ Get attendance error:", err);
       res.status(500).json({ error: err.message });
@@ -127,6 +137,7 @@ class AttendanceController {
       const summary = await attendanceService.getSummaryWithRecords(userId);
 
       res.json(summary);
+
     } catch (err) {
       console.error("❌ Get summary error:", err);
       res.status(500).json({ error: err.message });

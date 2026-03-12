@@ -133,7 +133,7 @@ const Calendar = ({ onBack }) => {
     setLoading(true);
     
     try {
-      await axios.delete(`${API_URL}/${eventId}`);
+      await axios.delete(`${API_URL}/${user.id}/${eventId}`);
       setEvents(prev => prev.filter(e => e.id !== eventId));
       setNotification('🗑️ Event deleted');
       setTimeout(() => setNotification(''), 2000);

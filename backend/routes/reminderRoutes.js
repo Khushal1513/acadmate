@@ -17,7 +17,7 @@ router.get('/user/:userId', getUserReminders);
 router.post('/add', addReminder);
 
 // Delete a reminder
-router.delete('/:eventId', deleteReminder);
+router.delete('/:userId/:eventId', deleteReminder);
 
 // Send a manual reminder email
 router.post('/send', sendReminderEmail);

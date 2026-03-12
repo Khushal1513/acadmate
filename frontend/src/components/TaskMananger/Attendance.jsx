@@ -6,15 +6,32 @@ import React, { useState, useEffect } from 'react';
 import './AttendanceTracker.css';
 import { attendanceAPI } from "../../services/api";
 
+const AttendanceSkeleton = () => (
+  <div className="attendance-tracker">
+    <div className="header-section skeleton-header">
+       <div className="skeleton-title shimmer" style={{ width: '250px', height: '40px' }}></div>
+    </div>
+    <div className="subjects-list">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="subject-container skeleton-card">
+          <div className="skeleton-title shimmer"></div>
+          <div className="skeleton-stats shimmer"></div>
+          <div className="skeleton-btns-row">
+             <div className="skeleton-button shimmer"></div>
+             <div className="skeleton-button shimmer"></div>
+             <div className="skeleton-button shimmer"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const Attendance = ({user}) => {
   const userId = user?.id || user?.uid || user?._id;
 
-  if (!userId) {
-    return <p>Please login to view attendance</p>;
-  }
-
   const [subjects, setSubjects] = useState([]);
-const [targetPercentage, setTargetPercentage] = useState("75");
+  const [targetPercentage, setTargetPercentage] = useState("75");
   const [newSubjectName, setNewSubjectName] = useState('');
   const [showHistoryFor, setShowHistoryFor] = useState(null);
   const [historyFilter, setHistoryFilter] = useState('all');
@@ -97,6 +114,14 @@ const [targetPercentage, setTargetPercentage] = useState("75");
     fetchAttendance();
   }, [userId]);
 
+    if (!userId) {
+    return <p>Please login to view attendance</p>;
+  }
+
+  if (isLoading && subjects.length === 0) {
+    return <AttendanceSkeleton />;
+  }
+
   const handleAddSubject = async () => {
     if (!newSubjectName.trim()) return;
     
@@ -140,7 +165,7 @@ const [targetPercentage, setTargetPercentage] = useState("75");
     setIsDeleting(true);
 
     try {
-      const url = `http://localhost:5001/attendance/subject/${userId}/${encodeURIComponent(subject.name)}`;
+      const url = `http://localhost:5001/api/attendance/subject/${userId}/${encodeURIComponent(subject.name)}`;
       
       const response = await fetch(url, {
         method: "DELETE",
@@ -284,14 +309,17 @@ const [targetPercentage, setTargetPercentage] = useState("75");
     return { total, present, absent, percentage };
   };
 
-  const getFilteredHistory = (attendance) => {
-    if (historyFilter === 'present') {
-      return attendance.filter(a => a.status === 'present');
-    } else if (historyFilter === 'absent') {
-      return attendance.filter(a => a.status === 'absent');
-    }
-    return attendance;
-  };
+const getFilteredHistory = (attendance = []) => {
+  if (historyFilter === 'present') {
+    return attendance.filter(a => a.status === 'present');
+  }
+
+  if (historyFilter === 'absent') {
+    return attendance.filter(a => a.status === 'absent');
+  }
+
+  return attendance;
+};
 
   return (
     <div className="attendance-tracker">
